@@ -1,4 +1,4 @@
-package cn.svecri.feedive
+package cn.svecri.feedive.ui.main
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
