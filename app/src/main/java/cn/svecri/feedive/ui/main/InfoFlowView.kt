@@ -4,6 +4,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -14,18 +15,78 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.ViewModel
 import cn.svecri.feedive.R
+import cn.svecri.feedive.model.Subscription
 import cn.svecri.feedive.ui.theme.FeediveTheme
+import java.time.Duration
+import java.time.LocalDateTime
+
+data class ArticleInfo(
+    val title: String,
+    val picUrl: String,
+    val sourceName: String,
+    val time: LocalDateTime?,
+    val abstract: String,
+    val hasRead: Boolean,
+    val protocol: String,
+    val starred: Boolean,
+)
+
+data class ArticleInfoSet(
+    val primary: ArticleInfo,
+    val others: List<ArticleInfo>,
+)
+
+class InfoFlowViewModel : ViewModel() {
+    fun subscriptions(): List<Subscription> {
+        return arrayListOf(Subscription("Imobile", "http://news.imobile.com.cn/rss/news.xml", ""))
+    }
+}
 
 @Composable
 fun InfoFlowView() {
     Scaffold(
         topBar = { TopAppBarWithTab() }
     ) {
-        LazyColumn {
-            items(arrayOf(0..2)) { _ ->
-                ArticleSetItem()
-            }
+        InfoFlowList()
+    }
+}
+
+@Composable
+fun InfoFlowList() {
+    val listState = rememberLazyListState()
+
+    LazyColumn(
+        state = listState
+    ) {
+        items(arrayOf(0..2)) { _ ->
+            ArticleSetItem(
+                ArticleInfoSet(
+                    primary = ArticleInfo(
+                        title = "Rainbond对接Istio原理讲解和代码实现分析",
+                        picUrl = "",
+                        sourceName = "Dockone",
+                        time = LocalDateTime.of(2022, 1, 1, 0, 0),
+                        abstract = "",
+                        hasRead = false,
+                        "RSS",
+                        false,
+                    ),
+                    others = arrayListOf(
+                        ArticleInfo(
+                            title = "谐云DevOps产品可信源管理从容应对Apache Log4j2高危漏洞",
+                            picUrl = "",
+                            sourceName = "Dockone",
+                            time = LocalDateTime.of(2022, 1, 1, 0, 0),
+                            abstract = "",
+                            hasRead = false,
+                            "RSS",
+                            false,
+                        )
+                    )
+                )
+            )
         }
     }
 }
@@ -81,20 +142,21 @@ fun TopAppBarWithTab() {
 }
 
 @Composable
-fun ArticleSetItem() {
+fun ArticleSetItem(infoSet: ArticleInfoSet) {
     Surface(
         modifier = Modifier.fillMaxWidth()
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
-            ArticleDetailedItem()
-            ArticleAbstractItem()
+            ArticleDetailedItem(infoSet.primary)
+            for (info in infoSet.others) {
+                ArticleAbstractItem(info)
+            }
         }
     }
 }
 
 @Composable
-fun ArticleDetailedItem() {
-    val withImage = true
+fun ArticleDetailedItem(info: ArticleInfo) {
     Surface(
         modifier = Modifier.fillMaxWidth()
     ) {
@@ -104,12 +166,23 @@ fun ArticleDetailedItem() {
                 .padding(10.dp),
             horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            Column(modifier = Modifier
-                .weight(1f)) {
-                Text(text = "Rainbond对接Istio原理讲解和代码实现分析", fontSize = 14.sp)
-                Text(text = "Dockone / 14 hr ago - has read", fontSize = 10.sp)
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+            ) {
+                Text(text = info.title, fontSize = 14.sp)
+                Text(
+                    text = "${info.sourceName}${
+                        if (info.time != null) " / ${
+                            Duration.between(
+                                info.time,
+                                LocalDateTime.now()
+                            ).toHours()
+                        } hr ago" else ""
+                    }${if (info.hasRead) " - has read" else ""}", fontSize = 10.sp
+                )
             }
-            if (withImage) {
+            if (info.picUrl.isNotEmpty()) {
                 Image(
                     modifier = Modifier
                         .fillMaxHeight()
@@ -124,8 +197,7 @@ fun ArticleDetailedItem() {
 }
 
 @Composable
-fun ArticleAbstractItem() {
-    val withImage = true
+fun ArticleAbstractItem(info: ArticleInfo) {
     Surface(
         modifier = Modifier.fillMaxWidth()
     ) {
@@ -135,11 +207,13 @@ fun ArticleAbstractItem() {
                 .padding(start = 20.dp, top = 5.dp, bottom = 5.dp, end = 10.dp),
             horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            Column(modifier = Modifier
-                .weight(1f)) {
-                Text(text = "谐云DevOps产品可信源管理从容应对Apache Log4j2高危漏洞", fontSize = 14.sp)
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+            ) {
+                Text(text = info.title, fontSize = 14.sp)
             }
-            if (withImage) {
+            if (info.picUrl.isNotEmpty()) {
                 Image(
                     modifier = Modifier
                         .fillMaxHeight()
@@ -165,6 +239,20 @@ fun PreviewHomeInfoFlow() {
 @Composable
 fun PreviewArticleSetItem() {
     FeediveTheme {
-        ArticleSetItem()
+        ArticleSetItem(
+            ArticleInfoSet(
+                primary = ArticleInfo(
+                    title = "Rainbond对接Istio原理讲解和代码实现分析",
+                    picUrl = "",
+                    sourceName = "Dockone",
+                    time = LocalDateTime.of(2022, 1, 1, 0, 0),
+                    abstract = "",
+                    hasRead = false,
+                    "RSS",
+                    false,
+                ),
+                others = arrayListOf()
+            )
+        )
     }
 }
