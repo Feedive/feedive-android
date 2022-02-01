@@ -1,11 +1,13 @@
 package cn.svecri.feedive.utils
 
+import android.util.Log
 import cn.svecri.feedive.model.Article
 import cn.svecri.feedive.model.ArticleCategory
 import cn.svecri.feedive.model.ArticleGuid
 import cn.svecri.feedive.model.Channel
 import org.w3c.dom.Document
 import org.w3c.dom.NodeList
+import java.io.EOFException
 import java.io.InputStream
 import javax.xml.parsers.DocumentBuilder
 import javax.xml.parsers.DocumentBuilderFactory
@@ -20,7 +22,12 @@ class RssParser {
 
     fun parse(inputStream: InputStream): Channel? {
         val builder: DocumentBuilder = builderFactory.newDocumentBuilder()
-        val document: Document = builder.parse(inputStream)
+        val document: Document = try {
+            builder.parse(inputStream)
+        } catch (e: EOFException) {
+            Log.e("RssParser", "Parse RSS Error: EOF")
+            return null;
+        }
         val xpath: XPath = xpathFactory.newXPath()
         val title: String =
             xpath.compile("/rss/channel/title//text()")
