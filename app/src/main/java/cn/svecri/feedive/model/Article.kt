@@ -7,7 +7,7 @@ data class ArticleCategory(
 
 data class ArticleEnclosure(
     val url: String = "",
-    val length: String = "",
+    val length: Int = 0,
     val type: String = "",
 )
 
