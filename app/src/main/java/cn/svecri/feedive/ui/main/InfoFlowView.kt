@@ -28,6 +28,7 @@ import cn.svecri.feedive.model.Subscription
 import cn.svecri.feedive.ui.theme.FeediveTheme
 import cn.svecri.feedive.utils.HttpWrapper
 import cn.svecri.feedive.utils.RssParser
+import coil.compose.rememberImagePainter
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.*
@@ -63,6 +64,9 @@ class InfoFlowViewModel : ViewModel() {
         DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"),
         DateTimeFormatter.BASIC_ISO_DATE,
     )
+
+    private fun getFirstImageUrl(html: String): String? =
+        "<img [^<>]*src=\"([^\"]+)\"[^<>]*>".toRegex().find(html)?.groupValues?.get(1)
 
     private fun subscriptions(): List<Subscription> {
         return arrayListOf(
@@ -118,8 +122,9 @@ class InfoFlowViewModel : ViewModel() {
             }
             ArticleInfo(
                 title = article.title,
+                picUrl = getFirstImageUrl(article.description).orEmpty(),
                 sourceName = sourceName,
-                time = pubDate
+                time = pubDate,
             )
         }.map { articleInfo ->
             Log.d("InfoFlow", articleInfo.toString())
@@ -279,7 +284,8 @@ fun ArticleDetailedItem(info: ArticleInfo) {
                     modifier = Modifier
                         .fillMaxHeight()
                         .width(120.dp),
-                    painter = painterResource(id = R.drawable.placeholder),
+//                    painter = painterResource(id = R.drawable.placeholder),
+                    painter = rememberImagePainter(info.picUrl),
                     contentScale = ContentScale.Crop,
                     contentDescription = "image"
                 )
