@@ -23,18 +23,15 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import cn.svecri.feedive.R
+import cn.svecri.feedive.model.Article
 import cn.svecri.feedive.model.Subscription
 import cn.svecri.feedive.ui.theme.FeediveTheme
+import cn.svecri.feedive.utils.HttpWrapper
 import cn.svecri.feedive.utils.RssParser
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.cancel
-import kotlinx.coroutines.channels.awaitClose
-import kotlinx.coroutines.channels.onFailure
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
-import okhttp3.*
-import java.io.IOException
 import java.time.Duration
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
@@ -57,10 +54,8 @@ data class ArticleInfoSet(
 )
 
 class InfoFlowViewModel : ViewModel() {
+    private val httpClient: HttpWrapper = HttpWrapper()
     var articles by mutableStateOf(listOf<ArticleInfoSet>())
-    private val httpClient: OkHttpClient = OkHttpClient.Builder()
-        .callTimeout(Duration.ofMillis(5000))
-        .build()
     private var currentRefreshJob: Job? = null;
 
     private val dateTimeFormatters: List<DateTimeFormatter> = arrayListOf(
@@ -68,12 +63,6 @@ class InfoFlowViewModel : ViewModel() {
         DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"),
         DateTimeFormatter.BASIC_ISO_DATE,
     )
-
-    val rssRequestBuilder: (String) -> Request = { url ->
-        Request.Builder()
-            .url(url)
-            .build()
-    }
 
     private fun subscriptions(): List<Subscription> {
         return arrayListOf(
@@ -83,33 +72,67 @@ class InfoFlowViewModel : ViewModel() {
         )
     }
 
-    private fun fetch(
-        url: String,
-        client: OkHttpClient,
-        request: Request.Builder = Request.Builder(),
-    ) = callbackFlow {
-        val req = request.url(url).build()
-        client.newCall(req).enqueue(object : Callback {
-            override fun onResponse(call: Call, response: Response) {
-                if (response.isSuccessful) {
-                    trySend(response)
-                        .onFailure {
-                            Log.e("InfoFlow", "Send Response Failed to Flow", it)
-                        }
-                } else {
-                    cancel("bad http code")
+    private fun fetchSubscription(subscription: Subscription) =
+        run { httpClient.fetchAsFlow(subscription.url) }
+
+    private fun fetchAllArticleInfo(subscription: Subscription) =
+        run {
+            fetchSubscription(subscription)
+                .map { response ->
+                    Log.d(
+                        "InfoFlow",
+                        "Process Response of ${subscription.name}: ${Thread.currentThread().name}"
+                    )
+                    response.body?.byteStream()?.use { inputStream ->
+                        RssParser().parse(inputStream)
+                    }
+                }
+                .filterNotNull()
+                .flatMapConcat { channel ->
+                    channel.articles.asFlow()
+                }
+                .filter { article ->
+                    article.title.isNotEmpty()
+                }
+                .onEach { article ->
+                    Log.d("InfoFlow", article.toString())
+                }
+                .asDisplay(subscription.name)
+        }
+
+    private fun Flow<Article>.asDisplay(sourceName: String) =
+        map { article ->
+            var pubDate: LocalDateTime? = null
+            for (formatter in dateTimeFormatters) {
+                try {
+                    pubDate = LocalDateTime.parse(
+                        article.pubDate,
+                        formatter
+                    )
+                    break
+                } catch (e: DateTimeParseException) {
                 }
             }
-
-            override fun onFailure(call: Call, e: IOException) {
-                cancel("okhttp error", e)
+            if (pubDate == null) {
+                Log.d("InfoFlow", "Unrecognized DateTime: ${article.pubDate}")
             }
-        })
-        awaitClose { }
-    }
+            ArticleInfo(
+                title = article.title,
+                sourceName = sourceName,
+                time = pubDate
+            )
+        }.map { articleInfo ->
+            Log.d("InfoFlow", articleInfo.toString())
+            ArticleInfoSet(
+                primary = articleInfo,
+                others = listOf()
+            )
+        }
 
-    private fun fetchSubscription(subscription: Subscription) =
-        run { fetch(subscription.url, httpClient) }
+    private fun Flow<ArticleInfoSet>.collectAsList() =
+        runningFold(listOf<ArticleInfoSet>()) { acc, value ->
+            acc + listOf(value)
+        }
 
     private fun fetchAllSubscriptions() = run {
         subscriptions().asFlow()
@@ -117,56 +140,9 @@ class InfoFlowViewModel : ViewModel() {
                 Log.d("InfoFlow", "${it.name} Flow Start: ${Thread.currentThread().name}")
             }
             .flatMapMerge { subscription ->
-                fetchSubscription(subscription)
-                    .map { response ->
-                        Log.d(
-                            "InfoFlow",
-                            "Process Response of ${subscription.name}: ${Thread.currentThread().name}"
-                        )
-                        response.body?.byteStream()?.use { inputStream ->
-                            RssParser().parse(inputStream)
-                        }
-                    }
-                    .filterNotNull()
-                    .flatMapConcat { channel ->
-                        channel.articles.asFlow()
-                    }
-                    .filter { article ->
-                        article.title.isNotEmpty()
-                    }
-                    .onEach { article ->
-                        Log.d("InfoFlow", article.toString())
-                    }
-                    .map { article ->
-                        var pubDate: LocalDateTime? = null
-                        for (formatter in dateTimeFormatters) {
-                            try {
-                                pubDate = LocalDateTime.parse(
-                                    article.pubDate,
-                                    formatter
-                                )
-                                break
-                            } catch (e: DateTimeParseException) {
-                                Log.d("InfoFlow", "Unrecognized DateTime: ${article.pubDate}")
-                            }
-                        }
-                        ArticleInfo(
-                            title = article.title,
-                            sourceName = subscription.name,
-                            time = pubDate
-                        )
-                    }
-                    .map { articleInfo ->
-                        Log.d("InfoFlow", articleInfo.toString())
-                        ArticleInfoSet(
-                            primary = articleInfo,
-                            others = listOf()
-                        )
-                    }
+                fetchAllArticleInfo(subscription)
             }
-            .runningFold(listOf<ArticleInfoSet>()) { acc, value ->
-                acc + listOf(value)
-            }
+            .collectAsList()
     }
 
     fun refresh() {
@@ -174,7 +150,6 @@ class InfoFlowViewModel : ViewModel() {
         currentRefreshJob = viewModelScope.launch(Dispatchers.Default) {
             fetchAllSubscriptions().collect { articleInfoSets ->
                 launch(Dispatchers.Main) {
-                    Log.d("InfoFlow", "${articleInfoSets.size}: ${Thread.currentThread().name}")
                     articles = articleInfoSets
                 }
             }
