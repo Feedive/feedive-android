@@ -37,6 +37,8 @@ import okhttp3.*
 import java.io.IOException
 import java.time.Duration
 import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
+import java.time.format.DateTimeParseException
 
 data class ArticleInfo(
     val title: String,
@@ -61,6 +63,12 @@ class InfoFlowViewModel : ViewModel() {
         .build()
     private var currentRefreshJob: Job? = null;
 
+    private val dateTimeFormatters: List<DateTimeFormatter> = arrayListOf(
+        DateTimeFormatter.RFC_1123_DATE_TIME,
+        DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"),
+        DateTimeFormatter.BASIC_ISO_DATE,
+    )
+
     val rssRequestBuilder: (String) -> Request = { url ->
         Request.Builder()
             .url(url)
@@ -69,6 +77,7 @@ class InfoFlowViewModel : ViewModel() {
 
     private fun subscriptions(): List<Subscription> {
         return arrayListOf(
+            Subscription("笔吧评测室", "http://feedive.app.cloudendpoint.cn/rss/wechat?id=611ce7048fae751e2363fc8b"),
             Subscription("Imobile", "http://news.imobile.com.cn/rss/news.xml", ""),
             Subscription("Sample", "https://www.rssboard.org/files/sample-rss-2.xml", ""),
         )
@@ -110,11 +119,11 @@ class InfoFlowViewModel : ViewModel() {
             .flatMapMerge { subscription ->
                 fetchSubscription(subscription)
                     .map { response ->
-                        Log.d("InfoFlow", "Process Response of ${subscription.name}: ${Thread.currentThread().name}")
+                        Log.d(
+                            "InfoFlow",
+                            "Process Response of ${subscription.name}: ${Thread.currentThread().name}"
+                        )
                         response.body?.byteStream()?.use { inputStream ->
-                            inputStream.bufferedReader().forEachLine {
-                                Log.v("InfoFlow", "Response Get: $it")
-                            }
                             RssParser().parse(inputStream)
                         }
                     }
@@ -122,13 +131,33 @@ class InfoFlowViewModel : ViewModel() {
                     .flatMapConcat { channel ->
                         channel.articles.asFlow()
                     }
+                    .filter { article ->
+                        article.title.isNotEmpty()
+                    }
+                    .onEach { article ->
+                        Log.d("InfoFlow", article.toString())
+                    }
                     .map { article ->
+                        var pubDate: LocalDateTime? = null
+                        for (formatter in dateTimeFormatters) {
+                            try {
+                                pubDate = LocalDateTime.parse(
+                                    article.pubDate,
+                                    formatter
+                                )
+                                break
+                            } catch (e: DateTimeParseException) {
+                                Log.d("InfoFlow", "Unrecognized DateTime: ${article.pubDate}")
+                            }
+                        }
                         ArticleInfo(
                             title = article.title,
                             sourceName = subscription.name,
+                            time = pubDate
                         )
                     }
                     .map { articleInfo ->
+                        Log.d("InfoFlow", articleInfo.toString())
                         ArticleInfoSet(
                             primary = articleInfo,
                             others = listOf()
@@ -144,7 +173,6 @@ class InfoFlowViewModel : ViewModel() {
         currentRefreshJob?.cancel()
         currentRefreshJob = viewModelScope.launch(Dispatchers.Default) {
             fetchAllSubscriptions().collect { articleInfoSets ->
-                Log.d("InfoFlow", "Update List: length() ${articleInfoSets.size}")
                 launch(Dispatchers.Main) {
                     Log.d("InfoFlow", "${articleInfoSets.size}: ${Thread.currentThread().name}")
                     articles = articleInfoSets
