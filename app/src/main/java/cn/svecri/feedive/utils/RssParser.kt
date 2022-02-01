@@ -1,10 +1,7 @@
 package cn.svecri.feedive.utils
 
 import android.util.Log
-import cn.svecri.feedive.model.Article
-import cn.svecri.feedive.model.ArticleCategory
-import cn.svecri.feedive.model.ArticleGuid
-import cn.svecri.feedive.model.Channel
+import cn.svecri.feedive.model.*
 import org.w3c.dom.Document
 import org.w3c.dom.NodeList
 import java.io.EOFException
@@ -29,6 +26,7 @@ class RssParser {
             return null;
         }
         val xpath: XPath = xpathFactory.newXPath()
+
         val title: String =
             xpath.compile("/rss/channel/title//text()")
                 .evaluate(document, XPathConstants.STRING) as String
@@ -38,6 +36,13 @@ class RssParser {
         val description: String =
             xpath.compile("/rss/channel/description//text()")
                 .evaluate(document, XPathConstants.STRING) as String
+        val language: String =
+            xpath.compile("/rss/channel/language//text()")
+                .evaluate(document, XPathConstants.STRING) as String
+        val copyright: String =
+            xpath.compile("/rss/channel/copyright//text()")
+                .evaluate(document, XPathConstants.STRING) as String
+
         val articles = arrayListOf<Article>()
         val articleList = xpath.compile("/rss/channel/item")
             .evaluate(document, XPathConstants.NODESET) as NodeList
@@ -63,6 +68,16 @@ class RssParser {
                     .evaluate(articleNode, XPathConstants.BOOLEAN) as Boolean
                 val articleComment = xpath.compile("comment//text()")
                     .evaluate(articleNode, XPathConstants.STRING) as String
+                val articleEnclosureUrl = xpath.compile("enclosure//@url")
+                    .evaluate(articleNode, XPathConstants.STRING) as String
+                val articleEnclosureLength = (xpath.compile("enclosure//@length")
+                    .evaluate(articleNode, XPathConstants.NUMBER) as Double).toInt()
+                val articleEnclosureType = xpath.compile("enclosure//@type")
+                    .evaluate(articleNode, XPathConstants.STRING) as String
+                val articleSourceUrl = xpath.compile("source//@url")
+                    .evaluate(articleNode, XPathConstants.STRING) as String
+                val articleSourceName = xpath.compile("source//text()")
+                    .evaluate(articleNode, XPathConstants.STRING) as String
                 articles.add(
                     Article(
                         title = articleTitle,
@@ -79,11 +94,27 @@ class RssParser {
                             value = articleGuid,
                         ),
                         comment = articleComment,
+                        enclosure = ArticleEnclosure(
+                            url = articleEnclosureUrl,
+                            length = articleEnclosureLength,
+                            type = articleEnclosureType,
+                        ),
+                        source = ArticleSource(
+                            url = articleSourceUrl,
+                            name = articleSourceName,
+                        ),
                     )
                 )
             }
         }
-        return Channel(title, link, description, articles)
+        return Channel(
+            title = title,
+            link = link,
+            description = description,
+            language = language,
+            copyright = copyright,
+            articles = articles,
+        )
     }
 
 }
