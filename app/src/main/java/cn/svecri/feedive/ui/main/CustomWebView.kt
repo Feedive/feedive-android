@@ -14,8 +14,8 @@ import kotlinx.coroutines.launch
 @Composable
 fun CustomWebView(
     modifier: Modifier = Modifier,
-//    url: String,
-    htmlStr: String,
+    url: String,
+//    htmlStr: String,
     onBack: (webView: WebView?) -> Unit,
     onProgressChange: (progress: Int) -> Unit = {},
     initSettings: (webSettings: WebSettings?) -> Unit = {},
@@ -83,8 +83,8 @@ fun CustomWebView(
             initSettings(this.settings)
             webView = this
 //            loadDataWithBaseURL()
-            this.loadDataWithBaseURL(null, htmlStr,mimeType,enCoding,null)
-//            loadUrl(url)
+//            this.loadDataWithBaseURL(null, htmlStr,mimeType,enCoding,null)
+            loadUrl(url)
 
         }
     })
