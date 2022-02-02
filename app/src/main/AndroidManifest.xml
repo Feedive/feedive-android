@@ -13,11 +13,6 @@
         android:theme="@style/Theme.Feedive"
         android:usesCleartextTraffic="true">
         <activity
-            android:name=".ui.main.ArticleActivity"
-            android:exported="false"
-            android:label="@string/title_activity_article"
-            android:theme="@style/Theme.Feedive.NoActionBar" />
-        <activity
             android:name=".ui.main.MainActivity"
             android:exported="true"
             android:label="@string/app_name"
