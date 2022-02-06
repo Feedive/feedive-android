@@ -2,6 +2,7 @@ package cn.svecri.feedive.ui.main
 
 import android.util.Log
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -16,6 +17,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -255,8 +257,11 @@ fun ArticleSetItem(infoSet: ArticleInfoSet) {
 @Composable
 fun ArticleDetailedItem(info: ArticleInfo) {
     Surface(
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier.fillMaxWidth().clickable {
+            Log.d("InfoFlow", "Click ${info.title}")
+        }
     ) {
+        // TODO: 未解决的排版错误：当带图片的一条文章标题比自己部分稍长时，item高度会仅为单行标题+小标题的高度，导致小标题被吞掉了
         Row(
             modifier = Modifier
                 .height(IntrinsicSize.Max)
@@ -267,7 +272,12 @@ fun ArticleDetailedItem(info: ArticleInfo) {
                 modifier = Modifier
                     .weight(1f)
             ) {
-                Text(text = info.title, fontSize = 14.sp)
+                Text(
+                    text = info.title,
+                    fontSize = 14.sp,
+                    overflow = TextOverflow.Ellipsis,
+                    maxLines = 3,
+                )
                 Text(
                     text = "${info.sourceName}${
                         if (info.time != null) " / ${
@@ -276,7 +286,9 @@ fun ArticleDetailedItem(info: ArticleInfo) {
                                 LocalDateTime.now()
                             ).toHours()
                         } hr ago" else ""
-                    }${if (info.hasRead) " - has read" else ""}", fontSize = 10.sp
+                    }${if (info.hasRead) " - has read" else ""}",
+                    fontSize = 10.sp,
+                    maxLines = 1,
                 )
             }
             if (info.picUrl.isNotEmpty()) {
@@ -316,7 +328,8 @@ fun ArticleAbstractItem(info: ArticleInfo) {
                     modifier = Modifier
                         .fillMaxHeight()
                         .width(90.dp),
-                    painter = painterResource(id = R.drawable.placeholder),
+//                    painter = painterResource(id = R.drawable.placeholder),
+                    painter = rememberImagePainter(info.picUrl),
                     contentScale = ContentScale.Crop,
                     contentDescription = "image"
                 )
@@ -388,7 +401,7 @@ fun PreviewInfoFlowList() {
                 ArticleInfoSet(
                     primary = ArticleInfo(
                         title = "Rainbond对接Istio原理讲解和代码实现分析",
-                        picUrl = "",
+                        picUrl = "some",
                         sourceName = "Dockone",
                         time = LocalDateTime.of(2022, 1, 1, 0, 0),
                         abstract = "",
