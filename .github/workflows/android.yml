@@ -37,6 +37,7 @@ jobs:
     - name: Build with Gradle
       env:
         SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: ./gradlew build sonarqube --info
       
     - name: Upload a Build Artifact
