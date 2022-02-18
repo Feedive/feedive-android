@@ -2,6 +2,8 @@ package cn.svecri.feedive.ui.main
 
 import android.util.Log
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -22,6 +24,8 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation.NavController
+import androidx.navigation.compose.rememberNavController
 import cn.svecri.feedive.R
 import cn.svecri.feedive.model.Article
 import cn.svecri.feedive.model.Subscription
@@ -55,7 +59,8 @@ data class ArticleInfoSet(
 
 class InfoFlowViewModel : ViewModel() {
     private val httpClient: HttpWrapper = HttpWrapper()
-    var articles by mutableStateOf(listOf<ArticleInfoSet>())
+    var articleInfos by mutableStateOf(listOf<ArticleInfoSet>())
+    var articles by mutableStateOf(mutableListOf<Article>())
     private var currentRefreshJob: Job? = null;
 
     private val dateTimeFormatters: List<DateTimeFormatter> = arrayListOf(
@@ -96,10 +101,11 @@ class InfoFlowViewModel : ViewModel() {
                 }
                 .onEach { article ->
                     Log.d("InfoFlow", article.toString())
+                    this.articles.add(article)
+//                    Log.d("InfoFlow", this.articles.size.toString())
                 }
                 .asDisplay(subscription.name)
         }
-
     private fun Flow<Article>.asDisplay(sourceName: String) =
         map { article ->
             var pubDate: LocalDateTime? = null
@@ -150,7 +156,7 @@ class InfoFlowViewModel : ViewModel() {
         currentRefreshJob = viewModelScope.launch(Dispatchers.Default) {
             fetchAllSubscriptions().collect { articleInfoSets ->
                 launch(Dispatchers.Main) {
-                    articles = articleInfoSets
+                    articleInfos = articleInfoSets
                 }
             }
         }
@@ -158,25 +164,30 @@ class InfoFlowViewModel : ViewModel() {
 }
 
 @Composable
-fun InfoFlowView(vm: InfoFlowViewModel = viewModel()) {
+fun InfoFlowView(navController: NavController, vm: InfoFlowViewModel = viewModel()) {
     Scaffold(
         topBar = { TopAppBarWithTab { vm.refresh() } }
     ) {
-        InfoFlowList(vm.articles)
+        InfoFlowList(vm.articleInfos,vm.articles,navController)
     }
 }
 
 @Composable
-fun InfoFlowList(articles: List<ArticleInfoSet>) {
+fun InfoFlowList(articleInfos: List<ArticleInfoSet>,articles: List<Article>,navController: NavController) {
     val listState = rememberLazyListState()
 
     Log.d("InfoFlow", "InfoFlowList Recompose")
+    Log.d("InfoFlow","Article Size unknown")
     LazyColumn(
         state = listState
     ) {
-        items(articles) { articleInfoSet ->
-            Log.d("InfoFlow", "New Item ${articleInfoSet.primary.title}")
-            ArticleSetItem(infoSet = articleInfoSet)
+//        items(articleInfos) { articleInfoSet ->
+//            Log.d("InfoFlow", "New Item ${articleInfoSet.primary.title}")
+//            ArticleSetItem(infoSet = articleInfoSet,navController)
+//        }
+        Log.d("InfoFlow","articleInfos and articles have equalSize:"+(articleInfos.size==articles.size).toString())
+        items(articleInfos.size){ index ->
+            ArticleSetItem(infoSet = articleInfos.get(index),articles.get(index),navController)
         }
     }
 }
@@ -234,9 +245,13 @@ fun TopAppBarWithTab(
 }
 
 @Composable
-fun ArticleSetItem(infoSet: ArticleInfoSet) {
+fun ArticleSetItem(infoSet: ArticleInfoSet,articleItem: Article,navController: NavController) {
     Surface(
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier.fillMaxWidth().clickable(onClick = {
+//            Log.d("InfoFlow",infoSet.toString())
+            Log.d("InfoFlow","link to "+articleItem.link)
+            navController.navigate("article?link=${articleItem.link}")
+        })
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
             ArticleDetailedItem(infoSet.primary)
@@ -322,14 +337,16 @@ fun ArticleAbstractItem(info: ArticleInfo) {
 @Preview(showBackground = true, group = "Overview")
 @Composable
 fun PreviewHomeInfoFlow() {
+    val navController = rememberNavController()
     FeediveTheme {
-        InfoFlowView()
+        InfoFlowView(navController)
     }
 }
 
 @Preview(showBackground = true, group = "Item")
 @Composable
 fun PreviewArticleSetItem() {
+    val navController = rememberNavController()
     FeediveTheme {
         ArticleSetItem(
             ArticleInfoSet(
@@ -345,6 +362,7 @@ fun PreviewArticleSetItem() {
                 ),
                 others = arrayListOf()
             )
+        , articleItem = Article(), navController = navController
         )
     }
 }
@@ -352,9 +370,10 @@ fun PreviewArticleSetItem() {
 @Preview(showBackground = true, group = "Item")
 @Composable
 fun PreviewInfoFlowList() {
+    val navController = rememberNavController()
     FeediveTheme {
         InfoFlowList(
-            articles = arrayListOf(
+            articleInfos = arrayListOf(
                 ArticleInfoSet(
                     primary = ArticleInfo(
                         title = "Rainbond对接Istio原理讲解和代码实现分析",
@@ -392,6 +411,6 @@ fun PreviewInfoFlowList() {
                     )
                 ),
             )
-        )
+        , articles = arrayListOf(), navController = navController)
     }
 }

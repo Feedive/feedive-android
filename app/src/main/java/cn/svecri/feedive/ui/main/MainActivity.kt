@@ -50,7 +50,10 @@ fun MainScreenView() {
 fun NavigationGraph(navController: NavHostController) {
     NavHost(navController, startDestination = BottomNavItem.InfoFlow.screenRoute) {
         composable(BottomNavItem.InfoFlow.screenRoute) {
-            InfoFlowView()
+            InfoFlowView(navController = navController)
+        }
+        composable("article?link={link}"){ backStackEntry ->
+            ArticleView(backStackEntry.arguments?.getString("link"))
         }
     }
 }
