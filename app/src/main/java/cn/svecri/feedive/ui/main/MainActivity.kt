@@ -62,7 +62,7 @@ fun NavigationGraph(navController: NavHostController, bottomPadding: Dp) {
             InfoFlowView(navController = navController)
         }
         composable("article?link={link}"){ backStackEntry ->
-            ArticleView(backStackEntry.arguments?.getString("link"))
+            backStackEntry.arguments?.getString("link")?.let { ArticleView(it) }
         }
     }
 }
