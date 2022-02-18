@@ -1,6 +1,8 @@
 package cn.svecri.feedive.ui.main
 
+import android.annotation.SuppressLint
 import android.os.Build
+import android.util.Log
 import android.webkit.WebSettings
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.LinearProgressIndicator
@@ -19,6 +21,7 @@ import cn.svecri.feedive.model.ArticleGuid
 import cn.svecri.feedive.model.ArticleSource
 import cn.svecri.feedive.ui.theme.FeediveTheme
 
+@SuppressLint("SetJavaScriptEnabled")
 @Composable
 fun ArticleView(link:String){
     var rememberWebViewProgress:Int by remember { mutableStateOf(-1) }
@@ -55,9 +58,7 @@ fun ArticleView(link:String){
                     //finish()
                 }
             }, onReceivedError = {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                    //Log.d("AAAA", ">>>>>>${it?.description}")
-                }
+                Log.d("ArticleView", ">>>>>>${it?.description}")
             }
         )
         LinearProgressIndicator(
