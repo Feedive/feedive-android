@@ -189,6 +189,16 @@ fun InfoFlowView(vm: InfoFlowViewModel = viewModel()) {
 @Composable
 fun InfoFlowList(articles: List<ArticleInfoWithState>) {
     val listState = rememberLazyListState()
+    val resetAllArticlesRevealState = {
+        var anyRevealed = false
+        articles.forEach { info ->
+            if (info.revealed.value) {
+                anyRevealed = true
+                info.revealed.value = false
+            }
+        }
+        anyRevealed
+    }
 
     Log.d("InfoFlow", "InfoFlowList Recompose")
     LazyColumn(
@@ -200,8 +210,22 @@ fun InfoFlowList(articles: List<ArticleInfoWithState>) {
             InteractiveArticleItem(
                 info = articleInfoWithState.info,
                 isRevealed = isRevealed,
-                onExpand = { isRevealed = true },
-                onCollapse = { isRevealed = false },
+                onClick = {
+                    if (!resetAllArticlesRevealState()) {
+                        Log.d("InfoFlow", "${articleInfoWithState.info.title} clicked")
+                    }
+                },
+                onExpand = {
+                    if (!isRevealed && !resetAllArticlesRevealState()) {
+                        Log.d("InfoFlow", "${articleInfoWithState.info.title} revealed")
+                        isRevealed = true
+                    }
+                },
+                onCollapse = {
+                    if (isRevealed) {
+                        isRevealed = false
+                    }
+                },
             )
         }
     }
@@ -390,7 +414,6 @@ fun ArticleDetailedItem(
         modifier = Modifier
             .fillMaxWidth()
             .clickable {
-                Log.d("InfoFlow", "Click ${info.title}")
                 onClick()
             }
     ) {
