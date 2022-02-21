@@ -21,6 +21,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.pointer.consumePositionChange
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -38,6 +39,8 @@ import cn.svecri.feedive.ui.theme.FeediveTheme
 import cn.svecri.feedive.utils.HttpWrapper
 import cn.svecri.feedive.utils.RssParser
 import coil.compose.rememberImagePainter
+import com.google.accompanist.swiperefresh.SwipeRefresh
+import com.google.accompanist.swiperefresh.rememberSwipeRefreshState
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.*
@@ -73,6 +76,9 @@ class InfoFlowViewModel : ViewModel() {
     private val httpClient: HttpWrapper = HttpWrapper()
     private val _articles = MutableStateFlow(listOf<ArticleInfoWithState>())
     val articles: StateFlow<List<ArticleInfoWithState>> get() = _articles
+
+    private val _isRefreshing = MutableStateFlow(false)
+    val isRefreshing: StateFlow<Boolean> get() = _isRefreshing
     private var currentRefreshJob: Job? = null;
 
     private val dateTimeFormatters: List<DateTimeFormatter> = arrayListOf(
@@ -86,14 +92,17 @@ class InfoFlowViewModel : ViewModel() {
 
     private fun subscriptions(): List<Subscription> {
         return arrayListOf(
-            Subscription("笔吧评测室", "http://feedive.app.cloudendpoint.cn/rss/wechat?id=611ce7048fae751e2363fc8b"),
+            Subscription(
+                "笔吧评测室",
+                "http://feedive.app.cloudendpoint.cn/rss/wechat?id=611ce7048fae751e2363fc8b"
+            ),
             Subscription("Imobile", "http://news.imobile.com.cn/rss/news.xml", ""),
             Subscription("Sample", "https://www.rssboard.org/files/sample-rss-2.xml", ""),
         )
     }
 
     private fun fetchSubscription(subscription: Subscription) =
-        run { httpClient.fetchAsFlow(subscription.url) }
+        run { httpClient.fetchAsFlow(subscription.url).onCompletion { Log.d("InfoFlow", "${subscription.name} fetch Completed") } }
 
     private fun fetchAllArticleInfo(subscription: Subscription) =
         run {
@@ -167,11 +176,20 @@ class InfoFlowViewModel : ViewModel() {
     fun refresh() {
         currentRefreshJob?.cancel()
         currentRefreshJob = viewModelScope.launch(Dispatchers.Default) {
-            fetchAllSubscriptions().collect { articleInfoList ->
-                launch(Dispatchers.Main) {
-                    _articles.emit(articleInfoList)
+            _isRefreshing.emit(true)
+            fetchAllSubscriptions()
+                .onCompletion {
+                    if (it is java.util.concurrent.CancellationException) {
+                        Log.i("InfoFlow", "Refresh Job Cancelled")
+                    } else {
+                        _isRefreshing.emit(false)
+                    }
                 }
-            }
+                .collect { articleInfoList ->
+                    launch(Dispatchers.Main) {
+                        _articles.emit(articleInfoList)
+                    }
+                }
         }
     }
 }
@@ -179,15 +197,26 @@ class InfoFlowViewModel : ViewModel() {
 @Composable
 fun InfoFlowView(vm: InfoFlowViewModel = viewModel()) {
     val articles by vm.articles.collectAsState()
+    val isRefreshing by vm.isRefreshing.collectAsState()
+    val swipeRefreshState = rememberSwipeRefreshState(isRefreshing = isRefreshing)
+
     Scaffold(
         topBar = { TopAppBarWithTab { vm.refresh() } }
     ) {
-        InfoFlowList(articles)
+        SwipeRefresh(
+            state = swipeRefreshState,
+            onRefresh = { vm.refresh() }
+        ) {
+            InfoFlowList(
+                articles,
+                offsetTop = with(LocalDensity.current) { swipeRefreshState.indicatorOffset.toDp() }
+            )
+        }
     }
 }
 
 @Composable
-fun InfoFlowList(articles: List<ArticleInfoWithState>) {
+fun InfoFlowList(articles: List<ArticleInfoWithState>, offsetTop: Dp = 0f.dp) {
     val listState = rememberLazyListState()
     val resetAllArticlesRevealState = {
         var anyRevealed = false
@@ -200,12 +229,11 @@ fun InfoFlowList(articles: List<ArticleInfoWithState>) {
         anyRevealed
     }
 
-    Log.d("InfoFlow", "InfoFlowList Recompose")
     LazyColumn(
-        state = listState
+        state = listState,
+        modifier = Modifier.offset(y = offsetTop)
     ) {
         items(articles) { articleInfoWithState ->
-            Log.d("InfoFlow", "New Item ${articleInfoWithState.info.title}")
             var isRevealed by articleInfoWithState.revealed
             InteractiveArticleItem(
                 info = articleInfoWithState.info,
