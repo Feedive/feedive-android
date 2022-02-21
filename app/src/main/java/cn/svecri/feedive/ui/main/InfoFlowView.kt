@@ -7,8 +7,8 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.updateTransition
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -32,6 +32,8 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation.NavController
+import androidx.navigation.compose.rememberNavController
 import cn.svecri.feedive.R
 import cn.svecri.feedive.model.Article
 import cn.svecri.feedive.model.Subscription
@@ -125,10 +127,11 @@ class InfoFlowViewModel : ViewModel() {
                 }
                 .onEach { article ->
                     Log.d("InfoFlow", article.toString())
+                    this.articles.add(article)
+//                    Log.d("InfoFlow", this.articles.size.toString())
                 }
                 .asDisplay(subscription.name)
         }
-
     private fun Flow<Article>.asDisplay(sourceName: String) =
         map { article ->
             var pubDate: LocalDateTime? = null
@@ -525,14 +528,16 @@ fun ArticleAbstractItem(info: ArticleInfo) {
 @Preview(showBackground = true, group = "Overview")
 @Composable
 fun PreviewHomeInfoFlow() {
+    val navController = rememberNavController()
     FeediveTheme {
-        InfoFlowView()
+        InfoFlowView(navController)
     }
 }
 
 @Preview(showBackground = true, group = "Item")
 @Composable
 fun PreviewArticleSetItem() {
+    val navController = rememberNavController()
     FeediveTheme {
         ArticleInfoWithState(
             info = ArticleInfo(
@@ -545,6 +550,7 @@ fun PreviewArticleSetItem() {
                 "RSS",
                 false,
             )
+        , articleItem = Article(), navController = navController
         )
     }
 }
@@ -552,6 +558,7 @@ fun PreviewArticleSetItem() {
 @Preview(showBackground = true, group = "Item")
 @Composable
 fun PreviewInfoFlowList() {
+    val navController = rememberNavController()
     FeediveTheme {
         InfoFlowList(
             articles = arrayListOf(
@@ -580,6 +587,6 @@ fun PreviewInfoFlowList() {
                     )
                 ),
             )
-        )
+        , articles = arrayListOf(), navController = navController)
     }
 }
