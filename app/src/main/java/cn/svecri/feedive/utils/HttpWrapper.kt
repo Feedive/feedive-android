@@ -2,8 +2,7 @@ package cn.svecri.feedive.utils
 
 import android.util.Log
 import kotlinx.coroutines.cancel
-import kotlinx.coroutines.channels.awaitClose
-import kotlinx.coroutines.channels.onFailure
+import kotlinx.coroutines.channels.*
 import kotlinx.coroutines.flow.callbackFlow
 import okhttp3.*
 import java.io.IOException
@@ -17,7 +16,7 @@ class HttpWrapper {
     fun fetchAsFlow(
         url: String,
         request: Request.Builder = Request.Builder(),
-    ) = callbackFlow {
+    ) = callbackFlow<Response> {
         val req = request.url(url).build()
         httpClient.newCall(req).enqueue(object : Callback {
             override fun onResponse(call: Call, response: Response) {
@@ -25,6 +24,10 @@ class HttpWrapper {
                     trySend(response)
                         .onFailure {
                             Log.e("InfoFlow", "Send Response Failed to Flow", it)
+                            channel.close()
+                        }
+                        .onSuccess {
+                            channel.close()
                         }
                 } else {
                     cancel("bad http code")
