@@ -9,6 +9,7 @@ import androidx.compose.animation.core.updateTransition
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -78,6 +79,7 @@ class InfoFlowViewModel : ViewModel() {
     private val httpClient: HttpWrapper = HttpWrapper()
     private val _articles = MutableStateFlow(listOf<ArticleInfoWithState>())
     val articles: StateFlow<List<ArticleInfoWithState>> get() = _articles
+    var articlesContent by mutableStateOf(mutableListOf<Article>())
 
     private val _isRefreshing = MutableStateFlow(false)
     val isRefreshing: StateFlow<Boolean> get() = _isRefreshing
@@ -127,7 +129,7 @@ class InfoFlowViewModel : ViewModel() {
                 }
                 .onEach { article ->
                     Log.d("InfoFlow", article.toString())
-                    this.articles.add(article)
+                    this.articlesContent.add(article)
 //                    Log.d("InfoFlow", this.articles.size.toString())
                 }
                 .asDisplay(subscription.name)
@@ -198,8 +200,9 @@ class InfoFlowViewModel : ViewModel() {
 }
 
 @Composable
-fun InfoFlowView(vm: InfoFlowViewModel = viewModel()) {
+fun InfoFlowView(vm: InfoFlowViewModel = viewModel(),navController: NavController) {
     val articles by vm.articles.collectAsState()
+    val articlesContent = vm.articlesContent
     val isRefreshing by vm.isRefreshing.collectAsState()
     val swipeRefreshState = rememberSwipeRefreshState(isRefreshing = isRefreshing)
 
@@ -212,14 +215,16 @@ fun InfoFlowView(vm: InfoFlowViewModel = viewModel()) {
         ) {
             InfoFlowList(
                 articles,
-                offsetTop = with(LocalDensity.current) { swipeRefreshState.indicatorOffset.toDp() }
+                articlesContent,
+                offsetTop = with(LocalDensity.current) { swipeRefreshState.indicatorOffset.toDp() },
+                navController
             )
         }
     }
 }
 
 @Composable
-fun InfoFlowList(articles: List<ArticleInfoWithState>, offsetTop: Dp = 0f.dp) {
+fun InfoFlowList(articles: List<ArticleInfoWithState>,articlesContent:List<Article>,offsetTop: Dp = 0f.dp,navController: NavController) {
     val listState = rememberLazyListState()
     val resetAllArticlesRevealState = {
         var anyRevealed = false
@@ -236,7 +241,10 @@ fun InfoFlowList(articles: List<ArticleInfoWithState>, offsetTop: Dp = 0f.dp) {
         state = listState,
         modifier = Modifier.offset(y = offsetTop)
     ) {
-        items(articles) { articleInfoWithState ->
+        items(articles.size) { index ->
+            Log.d("InfoFlow","Articles size == ArticlesContent size:"+"${articles.size==articlesContent.size}")
+            var articleInfoWithState = articles[index]
+            var articleContent = articlesContent[index]
             var isRevealed by articleInfoWithState.revealed
             InteractiveArticleItem(
                 info = articleInfoWithState.info,
@@ -244,6 +252,8 @@ fun InfoFlowList(articles: List<ArticleInfoWithState>, offsetTop: Dp = 0f.dp) {
                 onClick = {
                     if (!resetAllArticlesRevealState()) {
                         Log.d("InfoFlow", "${articleInfoWithState.info.title} clicked")
+                        Log.d("InfoFlow","navigate to ${articleContent.link}")
+                        navController.navigate("article?link=${articleContent.link}")
                     }
                 },
                 onExpand = {
@@ -530,7 +540,7 @@ fun ArticleAbstractItem(info: ArticleInfo) {
 fun PreviewHomeInfoFlow() {
     val navController = rememberNavController()
     FeediveTheme {
-        InfoFlowView(navController)
+        InfoFlowView(navController = navController)
     }
 }
 
@@ -550,7 +560,7 @@ fun PreviewArticleSetItem() {
                 "RSS",
                 false,
             )
-        , articleItem = Article(), navController = navController
+        ,
         )
     }
 }
@@ -587,6 +597,6 @@ fun PreviewInfoFlowList() {
                     )
                 ),
             )
-        , articles = arrayListOf(), navController = navController)
+        ,articlesContent=arrayListOf(), navController = navController)
     }
 }

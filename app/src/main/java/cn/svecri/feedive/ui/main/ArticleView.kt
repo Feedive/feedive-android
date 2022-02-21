@@ -15,6 +15,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.navigation.NavController
+import androidx.navigation.compose.rememberNavController
 import cn.svecri.feedive.model.Article
 import cn.svecri.feedive.model.ArticleCategory
 import cn.svecri.feedive.model.ArticleGuid
@@ -23,7 +25,7 @@ import cn.svecri.feedive.ui.theme.FeediveTheme
 
 @SuppressLint("SetJavaScriptEnabled")
 @Composable
-fun ArticleView(link:String){
+fun ArticleView(link:String,navController: NavController){
     var rememberWebViewProgress:Int by remember { mutableStateOf(-1) }
 
     Box {
@@ -56,6 +58,7 @@ fun ArticleView(link:String){
                     webView.goBack()
                 } else {
                     //finish()
+                    navController.navigateUp()
                 }
             }, onReceivedError = {
                 Log.d("ArticleView", ">>>>>>${it?.description}")
@@ -87,6 +90,7 @@ fun ArticlePreview() {
     )
     FeediveTheme {
 //        Text("231")
+        val navController = rememberNavController()
         val article = Article(
             title = "干货 | 论文解读：基于动态词表的对话生成研究",
             link = "http://blog.sina.com.cn/s/blog_4caedc7a0102x3o1.html",
@@ -98,7 +102,7 @@ fun ArticlePreview() {
             guid = ArticleGuid(),
             source = ArticleSource("MSRA")
         )
-        ArticleView(article.link)
+        ArticleView(article.link, navController = navController)
     }
 }
 
