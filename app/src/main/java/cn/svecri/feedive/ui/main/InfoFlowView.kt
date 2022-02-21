@@ -1,22 +1,31 @@
 package cn.svecri.feedive.ui.main
 
+import android.os.Parcelable
 import android.util.Log
+import androidx.compose.animation.core.MutableTransitionState
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.updateTransition
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.*
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.pointer.consumePositionChange
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.ViewModel
@@ -28,15 +37,19 @@ import cn.svecri.feedive.model.Subscription
 import cn.svecri.feedive.ui.theme.FeediveTheme
 import cn.svecri.feedive.utils.HttpWrapper
 import cn.svecri.feedive.utils.RssParser
+import coil.compose.rememberImagePainter
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import kotlinx.parcelize.IgnoredOnParcel
+import kotlinx.parcelize.Parcelize
 import java.time.Duration
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import java.time.format.DateTimeParseException
 
+@Parcelize
 data class ArticleInfo(
     val title: String,
     val picUrl: String = "",
@@ -46,16 +59,20 @@ data class ArticleInfo(
     val hasRead: Boolean = false,
     val protocol: String = "rss",
     val starred: Boolean = false,
-)
+) : Parcelable
 
-data class ArticleInfoSet(
-    val primary: ArticleInfo,
-    val others: List<ArticleInfo> = arrayListOf(),
-)
+@Parcelize
+class ArticleInfoWithState(
+    val info: ArticleInfo,
+) : Parcelable {
+    @IgnoredOnParcel
+    val revealed: MutableState<Boolean> = mutableStateOf(false)
+}
 
 class InfoFlowViewModel : ViewModel() {
     private val httpClient: HttpWrapper = HttpWrapper()
-    var articles by mutableStateOf(listOf<ArticleInfoSet>())
+    private val _articles = MutableStateFlow(listOf<ArticleInfoWithState>())
+    val articles: StateFlow<List<ArticleInfoWithState>> get() = _articles
     private var currentRefreshJob: Job? = null;
 
     private val dateTimeFormatters: List<DateTimeFormatter> = arrayListOf(
@@ -63,6 +80,9 @@ class InfoFlowViewModel : ViewModel() {
         DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"),
         DateTimeFormatter.BASIC_ISO_DATE,
     )
+
+    private fun getFirstImageUrl(html: String): String? =
+        "<img [^<>]*src=\"([^\"]+)\"[^<>]*>".toRegex().find(html)?.groupValues?.get(1)
 
     private fun subscriptions(): List<Subscription> {
         return arrayListOf(
@@ -118,19 +138,18 @@ class InfoFlowViewModel : ViewModel() {
             }
             ArticleInfo(
                 title = article.title,
+                picUrl = getFirstImageUrl(article.description).orEmpty(),
                 sourceName = sourceName,
-                time = pubDate
+                time = pubDate,
             )
         }.map { articleInfo ->
-            Log.d("InfoFlow", articleInfo.toString())
-            ArticleInfoSet(
-                primary = articleInfo,
-                others = listOf()
+            ArticleInfoWithState(
+                info = articleInfo
             )
         }
 
-    private fun Flow<ArticleInfoSet>.collectAsList() =
-        runningFold(listOf<ArticleInfoSet>()) { acc, value ->
+    private fun Flow<ArticleInfoWithState>.collectAsList() =
+        runningFold(listOf<ArticleInfoWithState>()) { acc, value ->
             acc + listOf(value)
         }
 
@@ -148,9 +167,9 @@ class InfoFlowViewModel : ViewModel() {
     fun refresh() {
         currentRefreshJob?.cancel()
         currentRefreshJob = viewModelScope.launch(Dispatchers.Default) {
-            fetchAllSubscriptions().collect { articleInfoSets ->
+            fetchAllSubscriptions().collect { articleInfoList ->
                 launch(Dispatchers.Main) {
-                    articles = articleInfoSets
+                    _articles.emit(articleInfoList)
                 }
             }
         }
@@ -159,24 +178,55 @@ class InfoFlowViewModel : ViewModel() {
 
 @Composable
 fun InfoFlowView(vm: InfoFlowViewModel = viewModel()) {
+    val articles by vm.articles.collectAsState()
     Scaffold(
         topBar = { TopAppBarWithTab { vm.refresh() } }
     ) {
-        InfoFlowList(vm.articles)
+        InfoFlowList(articles)
     }
 }
 
 @Composable
-fun InfoFlowList(articles: List<ArticleInfoSet>) {
+fun InfoFlowList(articles: List<ArticleInfoWithState>) {
     val listState = rememberLazyListState()
+    val resetAllArticlesRevealState = {
+        var anyRevealed = false
+        articles.forEach { info ->
+            if (info.revealed.value) {
+                anyRevealed = true
+                info.revealed.value = false
+            }
+        }
+        anyRevealed
+    }
 
     Log.d("InfoFlow", "InfoFlowList Recompose")
     LazyColumn(
         state = listState
     ) {
-        items(articles) { articleInfoSet ->
-            Log.d("InfoFlow", "New Item ${articleInfoSet.primary.title}")
-            ArticleSetItem(infoSet = articleInfoSet)
+        items(articles) { articleInfoWithState ->
+            Log.d("InfoFlow", "New Item ${articleInfoWithState.info.title}")
+            var isRevealed by articleInfoWithState.revealed
+            InteractiveArticleItem(
+                info = articleInfoWithState.info,
+                isRevealed = isRevealed,
+                onClick = {
+                    if (!resetAllArticlesRevealState()) {
+                        Log.d("InfoFlow", "${articleInfoWithState.info.title} clicked")
+                    }
+                },
+                onExpand = {
+                    if (!isRevealed && !resetAllArticlesRevealState()) {
+                        Log.d("InfoFlow", "${articleInfoWithState.info.title} revealed")
+                        isRevealed = true
+                    }
+                },
+                onCollapse = {
+                    if (isRevealed) {
+                        isRevealed = false
+                    }
+                },
+            )
         }
     }
 }
@@ -234,24 +284,140 @@ fun TopAppBarWithTab(
 }
 
 @Composable
-fun ArticleSetItem(infoSet: ArticleInfoSet) {
-    Surface(
-        modifier = Modifier.fillMaxWidth()
+fun InteractiveArticleItem(
+    info: ArticleInfo,
+    onClick: () -> Unit = {},
+    isRevealed: Boolean = false,
+    onExpand: () -> Unit = {},
+    onCollapse: () -> Unit = {},
+) {
+    DraggableCardWithButton(
+        modifier = Modifier.fillMaxWidth(),
+        isRevealed = isRevealed,
+        cardOffset = 200.dp,
+        onExpand = onExpand,
+        onCollapse = onCollapse,
     ) {
-        Column(modifier = Modifier.fillMaxWidth()) {
-            ArticleDetailedItem(infoSet.primary)
-            for (info in infoSet.others) {
-                ArticleAbstractItem(info)
-            }
-        }
+        ArticleDetailedItem(info, onClick = onClick)
     }
 }
 
 @Composable
-fun ArticleDetailedItem(info: ArticleInfo) {
-    Surface(
-        modifier = Modifier.fillMaxWidth()
+fun DraggableCardWithButton(
+    modifier: Modifier = Modifier,
+    isRevealed: Boolean,
+    cardOffset: Dp,
+    onExpand: () -> Unit,
+    onCollapse: () -> Unit,
+    content: @Composable () -> Unit,
+) {
+    val actionButtonModifier = { width: Dp ->
+        Modifier
+            .fillMaxHeight()
+            .width(width = width)
+    }
+    Box(
+        modifier = modifier
     ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .matchParentSize()
+        ) {
+            Button(
+                modifier = actionButtonModifier(50.dp),
+                onClick = { /*TODO*/ }
+            ) {
+                Text(text = "已读")
+            }
+            Button(
+                modifier = actionButtonModifier(50.dp),
+                onClick = { /*TODO*/ }
+            ) {
+                Text(text = "收藏")
+            }
+            Button(
+                modifier = actionButtonModifier(100.dp),
+                onClick = { /*TODO*/ }
+            ) {
+                Text(text = "稍后阅读")
+            }
+        }
+        DraggableCard(
+            isRevealed = isRevealed,
+            cardOffset = cardOffset,
+            onExpand = onExpand,
+            onCollapse = onCollapse,
+            content = content
+        )
+    }
+}
+
+@Composable
+fun DraggableCard(
+    isRevealed: Boolean,
+    cardOffset: Dp,
+    onExpand: () -> Unit,
+    onCollapse: () -> Unit,
+    content: @Composable () -> Unit,
+) {
+    val cardOffsetValue: Float = cardOffset.value
+    // offsetX is summed dragged offset by finger
+    val offsetX = remember { mutableStateOf(0f) }
+    val revealedTransitionState = remember {
+        MutableTransitionState(isRevealed)
+    }.apply {
+        targetState = isRevealed
+    }
+    val transition =
+        updateTransition(transitionState = revealedTransitionState, label = "cardOffsetTransition")
+    // offsetTransition is used to fill the remaining offset, as a result:
+    // offsetX + offsetTransition = cardOffset(revealed) or 0(unrevealed)
+    val offsetTransition by transition.animateFloat(
+        label = "cardOffsetTransition",
+        transitionSpec = { tween(durationMillis = 500) },
+        targetValueByState = {
+            if (it) cardOffsetValue - offsetX.value else -offsetX.value
+        }
+    )
+
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .offset((offsetX.value + offsetTransition).dp)
+            .pointerInput(Unit) {
+                detectHorizontalDragGestures { change, dragAmount ->
+                    val original = Offset(offsetX.value, 0f)
+                    val summed = original + Offset(x = dragAmount, y = 0f)
+                    val newValue = Offset(summed.x.coerceIn(0f, cardOffsetValue), 0f)
+                    if (newValue.x >= 10) {
+                        onExpand()
+                        return@detectHorizontalDragGestures
+                    } else if (newValue.x <= 0) {
+                        onCollapse()
+                        return@detectHorizontalDragGestures
+                    }
+                    change.consumePositionChange()
+                    offsetX.value = newValue.x
+                }
+            },
+        content = content,
+    )
+}
+
+@Composable
+fun ArticleDetailedItem(
+    info: ArticleInfo,
+    onClick: () -> Unit = {},
+) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable {
+                onClick()
+            }
+    ) {
+        // TODO: 未解决的排版错误：当带图片的一条文章标题比自己部分稍长时，item高度会仅为单行标题+小标题的高度，导致小标题被吞掉了
         Row(
             modifier = Modifier
                 .height(IntrinsicSize.Max)
@@ -262,7 +428,12 @@ fun ArticleDetailedItem(info: ArticleInfo) {
                 modifier = Modifier
                     .weight(1f)
             ) {
-                Text(text = info.title, fontSize = 14.sp)
+                Text(
+                    text = info.title,
+                    fontSize = 14.sp,
+                    overflow = TextOverflow.Ellipsis,
+                    maxLines = 3,
+                )
                 Text(
                     text = "${info.sourceName}${
                         if (info.time != null) " / ${
@@ -271,7 +442,9 @@ fun ArticleDetailedItem(info: ArticleInfo) {
                                 LocalDateTime.now()
                             ).toHours()
                         } hr ago" else ""
-                    }${if (info.hasRead) " - has read" else ""}", fontSize = 10.sp
+                    }${if (info.hasRead) " - has read" else ""}",
+                    fontSize = 10.sp,
+                    maxLines = 1,
                 )
             }
             if (info.picUrl.isNotEmpty()) {
@@ -279,7 +452,8 @@ fun ArticleDetailedItem(info: ArticleInfo) {
                     modifier = Modifier
                         .fillMaxHeight()
                         .width(120.dp),
-                    painter = painterResource(id = R.drawable.placeholder),
+//                    painter = painterResource(id = R.drawable.placeholder),
+                    painter = rememberImagePainter(info.picUrl),
                     contentScale = ContentScale.Crop,
                     contentDescription = "image"
                 )
@@ -310,7 +484,8 @@ fun ArticleAbstractItem(info: ArticleInfo) {
                     modifier = Modifier
                         .fillMaxHeight()
                         .width(90.dp),
-                    painter = painterResource(id = R.drawable.placeholder),
+//                    painter = painterResource(id = R.drawable.placeholder),
+                    painter = rememberImagePainter(info.picUrl),
                     contentScale = ContentScale.Crop,
                     contentDescription = "image"
                 )
@@ -331,19 +506,16 @@ fun PreviewHomeInfoFlow() {
 @Composable
 fun PreviewArticleSetItem() {
     FeediveTheme {
-        ArticleSetItem(
-            ArticleInfoSet(
-                primary = ArticleInfo(
-                    title = "Rainbond对接Istio原理讲解和代码实现分析",
-                    picUrl = "",
-                    sourceName = "Dockone",
-                    time = LocalDateTime.of(2022, 1, 1, 0, 0),
-                    abstract = "",
-                    hasRead = false,
-                    "RSS",
-                    false,
-                ),
-                others = arrayListOf()
+        ArticleInfoWithState(
+            info = ArticleInfo(
+                title = "Rainbond对接Istio原理讲解和代码实现分析",
+                picUrl = "",
+                sourceName = "Dockone",
+                time = LocalDateTime.of(2022, 1, 1, 0, 0),
+                abstract = "",
+                hasRead = false,
+                "RSS",
+                false,
             )
         )
     }
@@ -355,8 +527,8 @@ fun PreviewInfoFlowList() {
     FeediveTheme {
         InfoFlowList(
             articles = arrayListOf(
-                ArticleInfoSet(
-                    primary = ArticleInfo(
+                ArticleInfoWithState(
+                    info = ArticleInfo(
                         title = "Rainbond对接Istio原理讲解和代码实现分析",
                         picUrl = "",
                         sourceName = "Dockone",
@@ -365,24 +537,12 @@ fun PreviewInfoFlowList() {
                         hasRead = false,
                         "RSS",
                         false,
-                    ),
-                    others = arrayListOf(
-                        ArticleInfo(
-                            title = "谐云DevOps产品可信源管理从容应对Apache Log4j2高危漏洞",
-                            picUrl = "",
-                            sourceName = "Dockone",
-                            time = LocalDateTime.of(2022, 1, 1, 0, 0),
-                            abstract = "",
-                            hasRead = false,
-                            "RSS",
-                            false,
-                        )
                     )
                 ),
-                ArticleInfoSet(
-                    primary = ArticleInfo(
+                ArticleInfoWithState(
+                    info = ArticleInfo(
                         title = "Rainbond对接Istio原理讲解和代码实现分析",
-                        picUrl = "",
+                        picUrl = "some",
                         sourceName = "Dockone",
                         time = LocalDateTime.of(2022, 1, 1, 0, 0),
                         abstract = "",

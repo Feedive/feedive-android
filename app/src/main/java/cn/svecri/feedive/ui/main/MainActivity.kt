@@ -3,11 +3,16 @@ package cn.svecri.feedive.ui.main
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavHostController
@@ -42,13 +47,17 @@ fun MainScreenView() {
         backgroundColor = MaterialTheme.colors.background,
         bottomBar = { BottomNavigationBar(navController) }
     ) {
-        NavigationGraph(navController)
+        NavigationGraph(navController, it.calculateBottomPadding())
     }
 }
 
 @Composable
-fun NavigationGraph(navController: NavHostController) {
-    NavHost(navController, startDestination = BottomNavItem.InfoFlow.screenRoute) {
+fun NavigationGraph(navController: NavHostController, bottomPadding: Dp) {
+    NavHost(
+        navController,
+        startDestination = BottomNavItem.InfoFlow.screenRoute,
+        modifier = Modifier.padding(0.dp, 0.dp, 0.dp, bottomPadding),
+    ) {
         composable(BottomNavItem.InfoFlow.screenRoute) {
             InfoFlowView()
         }
@@ -65,6 +74,7 @@ fun BottomNavigationBar(navController: NavController) {
             BottomNavigationItem(
                 icon = {
                     Icon(
+                        modifier = Modifier.height(24.dp),
                         painter = painterResource(id = item.icon),
                         contentDescription = item.title
                     )
