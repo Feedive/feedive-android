@@ -29,7 +29,6 @@ import androidx.lifecycle.ViewModel
 import androidx.compose.runtime.Composable
 import androidx.lifecycle.viewmodel.compose.viewModel
 import cn.svecri.feedive.ui.theme.FeediveTheme
-import cn.svecri.feedive.ui.theme.Purple500
 
 
 data class GroupRow(
@@ -138,7 +137,7 @@ fun GroupSelectDialog(showDialog: Boolean, setShowDialog: (Boolean) -> Unit) {
                         border = BorderStroke(0.dp, Color.White)
                     )
                     {
-                        Text(text = "Cancel", color = Purple500)
+                        Text(text = "Cancel", color = MaterialTheme.colors.primary)
                     }
                     Button(
                         onClick = {
@@ -149,7 +148,7 @@ fun GroupSelectDialog(showDialog: Boolean, setShowDialog: (Boolean) -> Unit) {
                         elevation = ButtonDefaults.elevation(defaultElevation = 0.dp),
                         border = BorderStroke(0.dp, Color.White)
                     ) {
-                        Text(text = "OK", color = Purple500)
+                        Text(text = "OK", color = MaterialTheme.colors.primary)
                     }
                 }
             }
@@ -161,8 +160,12 @@ fun GroupSelectDialog(showDialog: Boolean, setShowDialog: (Boolean) -> Unit) {
 
 @Preview(showBackground = true)
 @Composable
+fun ResourceAddViewPreviewer() = ResourceAddView()
+
+
+@Composable
 fun ResourceAddView() {
-    val state = remember {
+    val isShowing = remember {
         mutableStateOf(true)
     }
     FeediveTheme {
@@ -207,21 +210,21 @@ fun ResourceAddView() {
                     horizontalArrangement = Arrangement.SpaceAround
                 ) {
                     Button(
-                        onClick = { state.value = false },
+                        onClick = { isShowing.value = false },
                         colors = buttonColors(Color.White),
                         elevation = ButtonDefaults.elevation(defaultElevation = 0.dp),
                         border = BorderStroke(0.dp, Color.White)
                     )
                     {
-                        Text(text = "Cancel", color = Purple500)
+                        Text(text = "Cancel", color = MaterialTheme.colors.primary)
                     }
                     Button(
-                        onClick = { state.value = false /*TODO*/ },
+                        onClick = { isShowing.value = false /*TODO*/ },
                         colors = buttonColors(Color.White),
                         elevation = ButtonDefaults.elevation(defaultElevation = 0.dp),
                         border = BorderStroke(0.dp, Color.White)
                     ) {
-                        Text(text = "OK", color = Purple500)
+                        Text(text = "OK", color = MaterialTheme.colors.primary)
                     }
                 }
             }
