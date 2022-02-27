@@ -45,5 +45,5 @@ data class Channel(
     val cloud: ChannelCloud? = null,
     val ttl: Int = 0,
     val image: ChannelImage? = null,
-    val articles: List<Article>
+    val rssArticles: List<RssArticle>
 )
