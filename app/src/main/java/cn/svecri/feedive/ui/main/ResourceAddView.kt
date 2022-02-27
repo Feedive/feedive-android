@@ -1,12 +1,18 @@
 package cn.svecri.feedive.ui.main
 
 
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.getValue
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.*
 import androidx.compose.material.ButtonDefaults.buttonColors
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -19,9 +25,60 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.window.SecureFlagPolicy
+import androidx.lifecycle.ViewModel
+import androidx.compose.runtime.Composable
+import androidx.lifecycle.viewmodel.compose.viewModel
 import cn.svecri.feedive.ui.theme.FeediveTheme
 import cn.svecri.feedive.ui.theme.Purple500
 
+
+data class GroupRow(
+    var isChecked: MutableState<Boolean> = mutableStateOf(false),
+    var groupName: String = ""
+)
+
+class GroupsViewModel : ViewModel() {
+    /*TODO: read from sql*/
+    var groups = mutableStateListOf(
+        GroupRow(mutableStateOf(false), "group1"),
+        GroupRow(mutableStateOf(false), "group2")
+    )
+
+    fun switchCheckState(row: GroupRow) {
+        row.isChecked.value = !row.isChecked.value
+    }
+
+    fun save2db() {
+        /*TODO*/
+    }
+}
+
+@Composable
+fun MultiSelectRow(groupRow: GroupRow, onSwitchCheckBox: (GroupRow) -> Unit) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Checkbox(
+            checked = groupRow.isChecked.value,
+            onCheckedChange = {
+                onSwitchCheckBox(groupRow)
+            }
+        )
+        Spacer(modifier = Modifier.size(ButtonDefaults.IconSpacing))
+        Text(text = groupRow.groupName)
+    }
+}
+
+@Composable
+fun GroupList(
+    groupsViewModel: GroupsViewModel = viewModel()
+) {
+    val groups = groupsViewModel.groups
+    val onSwitchChecked = groupsViewModel::switchCheckState
+    LazyColumn {
+        items(items = groups) { row ->
+            MultiSelectRow(groupRow = row, onSwitchCheckBox = { onSwitchChecked(row) })
+        }
+    }
+}
 
 @Composable
 fun GroupSelectDialog(showDialog: Boolean, setShowDialog: (Boolean) -> Unit) {
@@ -54,11 +111,21 @@ fun GroupSelectDialog(showDialog: Boolean, setShowDialog: (Boolean) -> Unit) {
                     fontWeight = FontWeight.Bold
                 )
                 Spacer(modifier = Modifier.height(6.dp))
-                Column {
-                    Spacer(modifier = Modifier.height(20.dp))
+
+                val groupsViewModel = GroupsViewModel()
+                GroupList(groupsViewModel)
+
+                Button(
+                    onClick = { /*TODO into edit group page*/ },
+                    colors = buttonColors(Color.White),
+                    elevation = ButtonDefaults.elevation(defaultElevation = 0.dp),
+                    border = BorderStroke(0.dp, Color.White),
+                    modifier = Modifier.align(alignment = Alignment.CenterHorizontally)
+                ) {
+                    Icon(Icons.Filled.Edit, contentDescription = "Edit")
+                    Spacer(Modifier.size(ButtonDefaults.IconSpacing))
+                    Text(text = "Edit groups")
                 }
-                Spacer(modifier = Modifier.height(10.dp))
-                Divider(modifier = Modifier.height(0.5.dp))
                 Row(
                     Modifier.fillMaxWidth(1f),
                     verticalAlignment = Alignment.CenterVertically,
@@ -74,7 +141,10 @@ fun GroupSelectDialog(showDialog: Boolean, setShowDialog: (Boolean) -> Unit) {
                         Text(text = "Cancel", color = Purple500)
                     }
                     Button(
-                        onClick = { setShowDialog(false) /*TODO*/ },
+                        onClick = {
+                            setShowDialog(false)
+                            groupsViewModel.save2db()
+                        },
                         colors = buttonColors(Color.White),
                         elevation = ButtonDefaults.elevation(defaultElevation = 0.dp),
                         border = BorderStroke(0.dp, Color.White)
@@ -96,7 +166,7 @@ fun ResourceAddView() {
         mutableStateOf(true)
     }
     FeediveTheme {
-        Box() {
+        Box {
             val (showSelectDialog, setShowSelectDialog) = remember { mutableStateOf(false) }
             Column(
                 Modifier
