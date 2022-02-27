@@ -1,5 +1,6 @@
 package cn.svecri.feedive.ui.main
 
+import android.app.Application
 import android.os.Parcelable
 import android.util.Log
 import androidx.compose.animation.core.MutableTransitionState
@@ -7,12 +8,10 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.updateTransition
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.*
 import androidx.compose.runtime.*
@@ -30,33 +29,33 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.lifecycle.ViewModel
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import androidx.navigation.compose.rememberNavController
+import androidx.paging.*
+import androidx.paging.compose.LazyPagingItems
+import androidx.paging.compose.collectAsLazyPagingItems
+import androidx.paging.compose.itemsIndexed
 import cn.svecri.feedive.R
-import cn.svecri.feedive.model.Article
-import cn.svecri.feedive.model.Subscription
+import cn.svecri.feedive.data.AppDatabase
+import cn.svecri.feedive.data.ArticleRemoteMediator
 import cn.svecri.feedive.ui.theme.FeediveTheme
 import cn.svecri.feedive.utils.HttpWrapper
-import cn.svecri.feedive.utils.RssParser
 import coil.compose.rememberImagePainter
 import com.google.accompanist.swiperefresh.SwipeRefresh
 import com.google.accompanist.swiperefresh.rememberSwipeRefreshState
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.flow.*
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
 import kotlinx.parcelize.IgnoredOnParcel
 import kotlinx.parcelize.Parcelize
 import java.time.Duration
 import java.time.LocalDateTime
-import java.time.format.DateTimeFormatter
-import java.time.format.DateTimeParseException
 
 @Parcelize
 data class ArticleInfo(
+    val articleId: Int,
     val title: String,
     val picUrl: String = "",
     val sourceName: String,
@@ -65,6 +64,7 @@ data class ArticleInfo(
     val hasRead: Boolean = false,
     val protocol: String = "rss",
     val starred: Boolean = false,
+    val link: String = "",
 ) : Parcelable
 
 @Parcelize
@@ -75,161 +75,89 @@ class ArticleInfoWithState(
     val revealed: MutableState<Boolean> = mutableStateOf(false)
 }
 
-class InfoFlowViewModel : ViewModel() {
+class InfoFlowViewModel(application: Application) : AndroidViewModel(application) {
     private val httpClient: HttpWrapper = HttpWrapper()
-    private val _articles = MutableStateFlow(listOf<ArticleInfoWithState>())
-    val articles: StateFlow<List<ArticleInfoWithState>> get() = _articles
-    var articlesContent by mutableStateOf(mutableListOf<Article>())
+    private val appDatabase = AppDatabase.getInstance(application)
+    private val articleDao = appDatabase.articleDao()
+    val groupName by mutableStateOf("All")
 
-    private val _isRefreshing = MutableStateFlow(false)
-    val isRefreshing: StateFlow<Boolean> get() = _isRefreshing
-    private var currentRefreshJob: Job? = null;
-
-    private val dateTimeFormatters: List<DateTimeFormatter> = arrayListOf(
-        DateTimeFormatter.RFC_1123_DATE_TIME,
-        DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"),
-        DateTimeFormatter.BASIC_ISO_DATE,
-    )
-
-    private fun getFirstImageUrl(html: String): String? =
-        "<img [^<>]*src=\"([^\"]+)\"[^<>]*>".toRegex().find(html)?.groupValues?.get(1)
-
-    private fun subscriptions(): List<Subscription> {
-        return arrayListOf(
-            Subscription(
-                "笔吧评测室",
-                "http://feedive.app.cloudendpoint.cn/rss/wechat?id=611ce7048fae751e2363fc8b"
-            ),
-            Subscription("Imobile", "http://news.imobile.com.cn/rss/news.xml", ""),
-            Subscription("Sample", "https://www.rssboard.org/files/sample-rss-2.xml", ""),
+    @OptIn(ExperimentalPagingApi::class)
+    val pager = Pager(
+        PagingConfig(
+            pageSize = 20,
+        ),
+        remoteMediator = ArticleRemoteMediator(appDatabase, httpClient, groupName, 5)
+    ) {
+        articleDao.queryArticles(
+            listOf(true, false),
+            listOf(true, false),
+            listOf(true, false),
+            groupName,
+            5
         )
     }
-
-    private fun fetchSubscription(subscription: Subscription) =
-        run { httpClient.fetchAsFlow(subscription.url).onCompletion { Log.d("InfoFlow", "${subscription.name} fetch Completed") } }
-
-    private fun fetchAllArticleInfo(subscription: Subscription) =
-        run {
-            fetchSubscription(subscription)
-                .map { response ->
-                    Log.d(
-                        "InfoFlow",
-                        "Process Response of ${subscription.name}: ${Thread.currentThread().name}"
-                    )
-                    response.body?.byteStream()?.use { inputStream ->
-                        RssParser().parse(inputStream)
-                    }
-                }
-                .filterNotNull()
-                .flatMapConcat { channel ->
-                    channel.articles.asFlow()
-                }
-                .filter { article ->
-                    article.title.isNotEmpty()
-                }
-                .onEach { article ->
-                    Log.d("InfoFlow", article.toString())
-                    this.articlesContent.add(article)
-//                    Log.d("InfoFlow", this.articles.size.toString())
-                }
-                .asDisplay(subscription.name)
-        }
-    private fun Flow<Article>.asDisplay(sourceName: String) =
-        map { article ->
-            var pubDate: LocalDateTime? = null
-            for (formatter in dateTimeFormatters) {
-                try {
-                    pubDate = LocalDateTime.parse(
-                        article.pubDate,
-                        formatter
-                    )
-                    break
-                } catch (e: DateTimeParseException) {
-                }
+    val articleFlow = pager.flow.map {
+        it
+            .map { article ->
+                ArticleInfo(
+                    article.id,
+                    article.title,
+                    article.picUrl,
+                    article.sourceName,
+                    article.pubTime,
+                    article.description,
+                    article.hasRead,
+                    article.protocol,
+                    article.starred,
+                    article.link,
+                )
             }
-            if (pubDate == null) {
-                Log.d("InfoFlow", "Unrecognized DateTime: ${article.pubDate}")
+            .map { articleInfo ->
+                ArticleInfoWithState(articleInfo)
             }
-            ArticleInfo(
-                title = article.title,
-                picUrl = getFirstImageUrl(article.description).orEmpty(),
-                sourceName = sourceName,
-                time = pubDate,
-            )
-        }.map { articleInfo ->
-            ArticleInfoWithState(
-                info = articleInfo
-            )
-        }
-
-    private fun Flow<ArticleInfoWithState>.collectAsList() =
-        runningFold(listOf<ArticleInfoWithState>()) { acc, value ->
-            acc + listOf(value)
-        }
-
-    private fun fetchAllSubscriptions() = run {
-        subscriptions().asFlow()
-            .onEach {
-                Log.d("InfoFlow", "${it.name} Flow Start: ${Thread.currentThread().name}")
-            }
-            .flatMapMerge { subscription ->
-                fetchAllArticleInfo(subscription)
-            }
-            .collectAsList()
-    }
-
-    fun refresh() {
-        currentRefreshJob?.cancel()
-        currentRefreshJob = viewModelScope.launch(Dispatchers.Default) {
-            _isRefreshing.emit(true)
-            fetchAllSubscriptions()
-                .onCompletion {
-                    if (it is java.util.concurrent.CancellationException) {
-                        Log.i("InfoFlow", "Refresh Job Cancelled")
-                    } else {
-                        _isRefreshing.emit(false)
-                    }
-                }
-                .collect { articleInfoList ->
-                    launch(Dispatchers.Main) {
-                        _articles.emit(articleInfoList)
-                    }
-                }
-        }
-    }
+    }.cachedIn(viewModelScope)
 }
 
 @Composable
-fun InfoFlowView(vm: InfoFlowViewModel = viewModel(),navController: NavController) {
-    val articles by vm.articles.collectAsState()
-    val articlesContent = vm.articlesContent
-    val isRefreshing by vm.isRefreshing.collectAsState()
+fun InfoFlowView(vm: InfoFlowViewModel = viewModel(), navController: NavController) {
+    val articles = vm.articleFlow.collectAsLazyPagingItems()
+    val isRefreshing = articles.loadState.refresh == LoadState.Loading
+    Log.d("InfoFlow", "Main View Recompose ${articles.loadState.refresh}")
     val swipeRefreshState = rememberSwipeRefreshState(isRefreshing = isRefreshing)
 
+    var groupName = vm.groupName
+
     Scaffold(
-        topBar = { TopAppBarWithTab { vm.refresh() } }
+        topBar = {
+            TopAppBarWithTab(groupName = groupName, onRefresh = { articles.refresh() }) {
+                groupName = it
+            }
+        }
     ) {
         SwipeRefresh(
             state = swipeRefreshState,
-            onRefresh = { vm.refresh() }
+            onRefresh = { articles.refresh() }
         ) {
             InfoFlowList(
                 articles,
-                articlesContent,
                 offsetTop = with(LocalDensity.current) { swipeRefreshState.indicatorOffset.toDp() },
-                navController
+                navController,
             )
         }
     }
 }
 
 @Composable
-fun InfoFlowList(articles: List<ArticleInfoWithState>,articlesContent:List<Article>,offsetTop: Dp = 0f.dp,navController: NavController) {
+fun InfoFlowList(
+    articles: LazyPagingItems<ArticleInfoWithState>,
+    offsetTop: Dp = 0f.dp,
+    navController: NavController
+) {
     val listState = rememberLazyListState()
     val resetAllArticlesRevealState = {
         var anyRevealed = false
-        articles.forEach { info ->
-            if (info.revealed.value) {
+        articles.itemSnapshotList.forEach { info ->
+            if (info?.revealed?.value == true) {
                 anyRevealed = true
                 info.revealed.value = false
             }
@@ -241,60 +169,62 @@ fun InfoFlowList(articles: List<ArticleInfoWithState>,articlesContent:List<Artic
         state = listState,
         modifier = Modifier.offset(y = offsetTop)
     ) {
-        items(articles.size) { index ->
-            Log.d("InfoFlow","Articles size == ArticlesContent size:"+"${articles.size==articlesContent.size}")
-            var articleInfoWithState = articles[index]
-            var articleContent = articlesContent[index]
-            var isRevealed by articleInfoWithState.revealed
-            InteractiveArticleItem(
-                info = articleInfoWithState.info,
-                isRevealed = isRevealed,
-                onClick = {
-                    if (!resetAllArticlesRevealState()) {
-                        Log.d("InfoFlow", "${articleInfoWithState.info.title} clicked")
-                        Log.d("InfoFlow","navigate to ${articleContent.link}")
-                        navController.navigate("article?link=${articleContent.link}")
-                    }
-                },
-                onExpand = {
-                    if (!isRevealed && !resetAllArticlesRevealState()) {
-                        Log.d("InfoFlow", "${articleInfoWithState.info.title} revealed")
-                        isRevealed = true
-                    }
-                },
-                onCollapse = {
-                    if (isRevealed) {
-                        isRevealed = false
-                    }
-                },
-            )
+        itemsIndexed(articles) { _, item ->
+            item?.let { articleInfoWithState ->
+                var isRevealed by articleInfoWithState.revealed
+                InteractiveArticleItem(
+                    info = articleInfoWithState.info,
+                    isRevealed = isRevealed,
+                    onClick = {
+                        if (!resetAllArticlesRevealState()) {
+                            Log.d("InfoFlow", "${articleInfoWithState.info.title} clicked")
+                            Log.d("InfoFlow", "navigate to ${articleInfoWithState.info.link}")
+                            navController.navigate("article?link=${articleInfoWithState.info.link}")
+                        }
+                    },
+                    onExpand = {
+                        if (!isRevealed && !resetAllArticlesRevealState()) {
+                            Log.d("InfoFlow", "${articleInfoWithState.info.title} revealed")
+                            isRevealed = true
+                        }
+                    },
+                    onCollapse = {
+                        if (isRevealed) {
+                            isRevealed = false
+                        }
+                    },
+                )
+            }
         }
     }
 }
 
 @Composable
 fun TopAppBarWithTab(
-    refresh: () -> Unit = {}
+    groupName: String,
+    onRefresh: () -> Unit = {},
+    setGroupName: (String) -> Unit = {}
 ) {
+    val groups = remember { listOf("All", "Computer") }
+    var tabIndex = groups.indexOf(groupName)
+    if (tabIndex < 0) {
+        tabIndex = 0
+        setGroupName(groups[0])
+    }
     TopAppBar(
         title = {
             ScrollableTabRow(
-                selectedTabIndex = 0,
+                selectedTabIndex = tabIndex,
                 modifier = Modifier.fillMaxHeight()
             ) {
-                Tab(
-                    selected = true,
-                    modifier = Modifier.fillMaxHeight(),
-                    onClick = { /*TODO*/ }
-                ) {
-                    Text(text = "All")
-                }
-                Tab(
-                    selected = false,
-                    modifier = Modifier.fillMaxHeight(),
-                    onClick = { /*TODO*/ }
-                ) {
-                    Text(text = "Computer")
+                for (group in groups) {
+                    Tab(
+                        selected = true,
+                        modifier = Modifier.fillMaxHeight(),
+                        onClick = { setGroupName(group) }
+                    ) {
+                        Text(text = group)
+                    }
                 }
             }
         },
@@ -308,7 +238,7 @@ fun TopAppBarWithTab(
                     Text(text = "4", fontSize = 16.sp, fontWeight = FontWeight.Bold)
                 }
             }
-            IconButton(onClick = refresh) {
+            IconButton(onClick = onRefresh) {
                 Icon(
                     painter = painterResource(id = R.drawable.ic_baseline_refresh_24),
                     contentDescription = "Refresh Icon"
@@ -547,10 +477,10 @@ fun PreviewHomeInfoFlow() {
 @Preview(showBackground = true, group = "Item")
 @Composable
 fun PreviewArticleSetItem() {
-    val navController = rememberNavController()
     FeediveTheme {
         ArticleInfoWithState(
             info = ArticleInfo(
+                articleId = 0,
                 title = "Rainbond对接Istio原理讲解和代码实现分析",
                 picUrl = "",
                 sourceName = "Dockone",
@@ -559,8 +489,7 @@ fun PreviewArticleSetItem() {
                 hasRead = false,
                 "RSS",
                 false,
-            )
-        ,
+            ),
         )
     }
 }
@@ -569,11 +498,12 @@ fun PreviewArticleSetItem() {
 @Composable
 fun PreviewInfoFlowList() {
     val navController = rememberNavController()
-    FeediveTheme {
-        InfoFlowList(
-            articles = arrayListOf(
+    val articleFlow = flowOf(
+        PagingData.from(
+            arrayListOf(
                 ArticleInfoWithState(
                     info = ArticleInfo(
+                        articleId = 0,
                         title = "Rainbond对接Istio原理讲解和代码实现分析",
                         picUrl = "",
                         sourceName = "Dockone",
@@ -586,6 +516,7 @@ fun PreviewInfoFlowList() {
                 ),
                 ArticleInfoWithState(
                     info = ArticleInfo(
+                        articleId = 1,
                         title = "Rainbond对接Istio原理讲解和代码实现分析",
                         picUrl = "some",
                         sourceName = "Dockone",
@@ -597,6 +528,11 @@ fun PreviewInfoFlowList() {
                     )
                 ),
             )
-        ,articlesContent=arrayListOf(), navController = navController)
+        )
+    )
+    FeediveTheme {
+        InfoFlowList(
+            articles = articleFlow.collectAsLazyPagingItems(), navController = navController
+        )
     }
 }
