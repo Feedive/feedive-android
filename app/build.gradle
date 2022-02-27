@@ -1,6 +1,7 @@
 plugins {
     id 'com.android.application'
     id 'kotlin-android'
+    id 'kotlin-kapt'
     id 'kotlin-parcelize'
 }
 
@@ -30,15 +31,6 @@ android {
         sourceCompatibility JavaVersion.VERSION_1_8
         targetCompatibility JavaVersion.VERSION_1_8
     }
-//    javaCompileOptions {
-//        annotationProcessorOptions {
-//            arguments += [
-//                    "room.schemaLocation":"$projectDir/schemas".toString(),
-//                    "room.incremental":"true",
-//                    "room.expandProjection":"true"
-//            ]
-//        }
-//    }
     kotlinOptions {
         jvmTarget = '1.8'
         useIR = true
@@ -69,12 +61,20 @@ dependencies {
     implementation 'androidx.navigation:navigation-compose:2.4.1'
 
     def room_version = "2.4.1"
-    implementation "androidx.room:room-runtime:$room_version"
-    annotationProcessor "androidx.room:room-compiler:$room_version"
+    implementation "androidx.room:room-ktx:$room_version"
+    kapt "androidx.room:room-compiler:$room_version"
     // optional - Test helpers
     testImplementation "androidx.room:room-testing:$room_version"
     // optional - Paging 3 Integration
     implementation "androidx.room:room-paging:2.4.1"
+
+    def paging_version = "3.1.0"
+
+    implementation "androidx.paging:paging-runtime-ktx:$paging_version"
+    // alternatively - without Android dependencies for tests
+    testImplementation "androidx.paging:paging-common-ktx:$paging_version"
+    // optional - Jetpack Compose integration
+    implementation "androidx.paging:paging-compose:1.0.0-alpha14"
 
     implementation "com.google.accompanist:accompanist-swiperefresh:0.23.0"
 

@@ -21,7 +21,7 @@ data class ArticleSource(
     val name: String = "",
 )
 
-data class Article(
+data class RssArticle(
     val title: String = "",
     val link: String = "",
     val description: String = "",

@@ -43,7 +43,7 @@ class RssParser {
             xpath.compile("/rss/channel/copyright//text()")
                 .evaluate(document, XPathConstants.STRING) as String
 
-        val articles = arrayListOf<Article>()
+        val articles = arrayListOf<RssArticle>()
         val articleList = xpath.compile("/rss/channel/item")
             .evaluate(document, XPathConstants.NODESET) as NodeList
         for (i in 1..articleList.length) {
@@ -79,7 +79,7 @@ class RssParser {
                 val articleSourceName = xpath.compile("source//text()")
                     .evaluate(articleNode, XPathConstants.STRING) as String
                 articles.add(
-                    Article(
+                    RssArticle(
                         title = articleTitle,
                         link = articleLink,
                         description = articleDescription,
@@ -113,7 +113,7 @@ class RssParser {
             description = description,
             language = language,
             copyright = copyright,
-            articles = articles,
+            rssArticles = articles,
         )
     }
 
