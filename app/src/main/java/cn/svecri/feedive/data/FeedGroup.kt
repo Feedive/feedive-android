@@ -4,7 +4,7 @@ import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 
-@Entity
+@Entity(tableName = "feed_group")
 data class FeedGroup(
     @PrimaryKey(autoGenerate = true)
     @ColumnInfo(name = "feed_group_id")
