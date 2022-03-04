@@ -1,6 +1,7 @@
 package cn.svecri.feedive.ui.main
 
 
+import android.app.Application
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.getValue
 import androidx.compose.foundation.BorderStroke
@@ -19,7 +20,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
@@ -27,8 +27,14 @@ import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.window.SecureFlagPolicy
 import androidx.lifecycle.ViewModel
 import androidx.compose.runtime.Composable
+import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
+import cn.svecri.feedive.data.AppDatabase
+import cn.svecri.feedive.data.Feed
 import cn.svecri.feedive.ui.theme.FeediveTheme
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 
 
 data class GroupRow(
@@ -49,6 +55,17 @@ class GroupsViewModel : ViewModel() {
 
     fun save2db() {
         /*TODO*/
+    }
+}
+
+class ResourceManagerViewModel(application: Application) : AndroidViewModel(application) {
+    private val appDatabase = AppDatabase.getInstance(application)
+    private val feedDao = appDatabase.FeedDao()
+
+    fun insertFeed(feed: Feed) {
+        viewModelScope.launch(Dispatchers.IO) {
+            feedDao.insertFeed(feed = feed)
+        }
     }
 }
 
@@ -164,17 +181,18 @@ fun ResourceAddViewPreviewer() = ResourceAddView()
 
 
 @Composable
-fun ResourceAddView() {
+fun ResourceAddView(vm: ResourceManagerViewModel = viewModel()) {
     val isShowing = remember {
         mutableStateOf(true)
     }
+
     FeediveTheme {
         Box {
             val (showSelectDialog, setShowSelectDialog) = remember { mutableStateOf(false) }
             Column(
                 Modifier
                     .fillMaxWidth(1f)
-                    .height(Dp(240f))
+                    .height(800.dp)
                     .background(Color.White)
                     .padding(horizontal = 24.dp, vertical = 20.dp),
                 verticalArrangement = Arrangement.SpaceAround,
@@ -186,12 +204,29 @@ fun ResourceAddView() {
                     fontSize = 20.sp,
                     fontWeight = FontWeight.Bold
                 )
-                var text by remember { mutableStateOf("") }
-
+                var nameText by remember { mutableStateOf("") }
                 OutlinedTextField(
-                    value = text,
-                    onValueChange = { text = it },
+                    value = nameText,
+                    onValueChange = { nameText = it },
+                    label = { Text("Name") }
+                )
+                var urlText by remember { mutableStateOf("") }
+                OutlinedTextField(
+                    value = urlText,
+                    onValueChange = { urlText = it },
                     label = { Text("URL") }
+                )
+                var feedType by remember { mutableStateOf("") }
+                OutlinedTextField(
+                    value = feedType,
+                    onValueChange = { feedType = it },
+                    label = { Text("Type") }
+                )
+                var feedPriority by remember { mutableStateOf("") }
+                OutlinedTextField(
+                    value = feedPriority,
+                    onValueChange = { feedPriority = it },
+                    label = { Text("Priority") }
                 )
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(text = "Group: ")
@@ -219,7 +254,18 @@ fun ResourceAddView() {
                         Text(text = "Cancel", color = MaterialTheme.colors.primary)
                     }
                     Button(
-                        onClick = { isShowing.value = false /*TODO*/ },
+                        onClick = {
+                            isShowing.value = false
+                            vm.insertFeed(
+                                Feed(
+                                    0,
+                                    feedName = nameText,
+                                    feedType = feedType,
+                                    feedUrl = urlText,
+                                    feedPriority = feedPriority.toInt()
+                                )
+                            )
+                        },
                         colors = buttonColors(Color.White),
                         elevation = ButtonDefaults.elevation(defaultElevation = 0.dp),
                         border = BorderStroke(0.dp, Color.White)
