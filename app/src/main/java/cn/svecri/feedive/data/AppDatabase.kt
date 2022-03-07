@@ -17,9 +17,9 @@ import cn.svecri.feedive.utils.DATABASE_NAME
 @TypeConverters(Converters::class)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun articleDao(): ArticleDao
-    abstract fun FeedDao(): FeedDao
-    abstract fun FeedGroupDao(): FeedGroupDao
-    abstract fun FeedInGroupDao(): FeedInGroup
+    abstract fun feedDao(): FeedDao
+    abstract fun feedGroupDao(): FeedGroupDao
+    abstract fun feedInGroupDao(): FeedInGroup
 
     companion object {
         @Volatile

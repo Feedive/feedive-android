@@ -60,7 +60,7 @@ class GroupsViewModel : ViewModel() {
 
 class ResourceManagerViewModel(application: Application) : AndroidViewModel(application) {
     private val appDatabase = AppDatabase.getInstance(application)
-    private val feedDao = appDatabase.FeedDao()
+    private val feedDao = appDatabase.feedDao()
 
     fun insertFeed(feed: Feed) {
         viewModelScope.launch(Dispatchers.IO) {
