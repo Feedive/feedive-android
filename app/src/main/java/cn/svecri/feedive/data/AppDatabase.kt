@@ -8,13 +8,22 @@ import androidx.room.TypeConverters
 import androidx.sqlite.db.SupportSQLiteDatabase
 import cn.svecri.feedive.utils.DATABASE_NAME
 
-@Database(entities = [Article::class], version = 1, exportSchema = false)
+
+@Database(
+    entities = [Article::class, Feed::class, FeedGroup::class, FeedInGroup::class],
+    version = 1,
+    exportSchema = false
+)
 @TypeConverters(Converters::class)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun articleDao(): ArticleDao
+    abstract fun feedDao(): FeedDao
+    abstract fun feedGroupDao(): FeedGroupDao
+    abstract fun feedInGroupDao(): FeedInGroup
 
     companion object {
-        @Volatile private var instance: AppDatabase? = null
+        @Volatile
+        private var instance: AppDatabase? = null
 
         fun getInstance(context: Context): AppDatabase {
             return instance ?: synchronized(this) {
