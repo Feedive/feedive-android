@@ -8,6 +8,7 @@ import androidx.room.TypeConverters
 import androidx.sqlite.db.SupportSQLiteDatabase
 import cn.svecri.feedive.utils.DATABASE_NAME
 
+
 @Database(
     entities = [Article::class, Feed::class, FeedGroup::class, FeedInGroup::class],
     version = 1,
