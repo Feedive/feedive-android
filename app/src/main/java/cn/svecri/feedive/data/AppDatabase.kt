@@ -19,7 +19,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun articleDao(): ArticleDao
     abstract fun feedDao(): FeedDao
     abstract fun feedGroupDao(): FeedGroupDao
-    abstract fun feedInGroupDao(): FeedInGroup
+    abstract fun feedInGroupDao(): FeedInGroupDao
 
     companion object {
         @Volatile
