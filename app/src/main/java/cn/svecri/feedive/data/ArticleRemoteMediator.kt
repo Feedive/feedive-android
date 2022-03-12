@@ -16,9 +16,18 @@ import kotlinx.coroutines.withContext
 class ArticleRemoteMediator(
     private val database: AppDatabase,
     private val httpClient: HttpWrapper,
-    private val groupName: String,
-    private val sourcePriority: Int,
+    private val fetchCondition: FetchCondition,
 ) : RemoteMediator<Int, Article>() {
+    enum class RefreshType {
+        REMOTE,
+        NO_REMOTE,
+    }
+
+    class FetchCondition(
+        var groupName: String,
+        var sourcePriority: Int,
+        var refreshType: ArticleRemoteMediator.RefreshType = RefreshType.REMOTE,)
+
     private val articleDao: ArticleDao = database.articleDao()
 
     private fun feeds(): List<Feed> {
@@ -89,9 +98,11 @@ class ArticleRemoteMediator(
             LoadType.APPEND ->
                 MediatorResult.Success(endOfPaginationReached = true)
             LoadType.REFRESH -> {
-                withContext(Dispatchers.IO) {
-                    fetchAllFeeds().collect {
-                        articleDao.insertAll(listOf(it))
+                if (fetchCondition.refreshType == RefreshType.REMOTE) {
+                    withContext(Dispatchers.IO) {
+                        fetchAllFeeds().collect {
+                            articleDao.insertAll(listOf(it))
+                        }
                     }
                 }
                 MediatorResult.Success(endOfPaginationReached = true)
