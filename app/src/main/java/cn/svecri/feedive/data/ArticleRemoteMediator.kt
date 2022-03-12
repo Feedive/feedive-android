@@ -6,7 +6,6 @@ import androidx.paging.LoadType
 import androidx.paging.PagingState
 import androidx.paging.RemoteMediator
 import cn.svecri.feedive.model.RssArticle
-import cn.svecri.feedive.model.Subscription
 import cn.svecri.feedive.utils.HttpWrapper
 import cn.svecri.feedive.utils.RssParser
 import kotlinx.coroutines.Dispatchers
@@ -22,34 +21,35 @@ class ArticleRemoteMediator(
 ) : RemoteMediator<Int, Article>() {
     private val articleDao: ArticleDao = database.articleDao()
 
-    private fun subscriptions(): List<Subscription> {
+    private fun feeds(): List<Feed> {
         return arrayListOf(
-            Subscription(
-                "笔吧评测室",
-                "http://feedive.app.cloudendpoint.cn/rss/wechat?id=611ce7048fae751e2363fc8b"
+            Feed(
+                0, "笔吧评测室", "rss",
+                "http://feedive.app.cloudendpoint.cn/rss/wechat?id=611ce7048fae751e2363fc8b",
+                1,
             ),
-            Subscription("Imobile", "http://news.imobile.com.cn/rss/news.xml", ""),
-            Subscription("Sample", "https://www.rssboard.org/files/sample-rss-2.xml", ""),
+            Feed(1, "Imobile", "rss",  "http://news.imobile.com.cn/rss/news.xml", 2),
+            Feed(1, "Sample",  "rss", "https://www.rssboard.org/files/sample-rss-2.xml", 4),
         )
     }
 
-    private fun fetchAllSubscriptions() = run {
-        subscriptions().asFlow()
+    private fun fetchAllFeeds() = run {
+        feeds().asFlow()
             .onEach {
-                Log.d("InfoFlow", "${it.name} Flow Start: ${Thread.currentThread().name}")
+                Log.d("InfoFlow", "${it.feedName} Flow Start: ${Thread.currentThread().name}")
             }
-            .flatMapMerge { subscription ->
-                fetchSubscriptionArticleInfo(subscription)
+            .flatMapMerge { feed ->
+                fetchFeedArticleInfo(feed)
             }
     }
 
-    private fun fetchSubscriptionArticleInfo(subscription: Subscription) =
+    private fun fetchFeedArticleInfo(feed: Feed) =
         run {
-            fetchSubscription(subscription)
+            fetchFeed(feed)
                 .map { response ->
                     Log.d(
                         "ArticleRemoteMediator",
-                        "Process Response of ${subscription.name}: ${Thread.currentThread().name}"
+                        "Process Response of ${feed.feedName}: ${Thread.currentThread().name}"
                     )
                     response.body?.byteStream()?.use { inputStream ->
                         RssParser().parse(inputStream)
@@ -62,21 +62,21 @@ class ArticleRemoteMediator(
                 .filter { article ->
                     article.title.isNotEmpty()
                 }
-                .asStorage(subscription.name)
+                .asStorage(feed.feedId, feed.feedName)
                 .filter { article ->
                     article.storageKey.isNotEmpty()
                 }
         }
 
-    private fun fetchSubscription(subscription: Subscription) =
+    private fun fetchFeed(feed: Feed) =
         run {
-            httpClient.fetchAsFlow(subscription.url)
-                .onCompletion { Log.d("InfoFlow", "${subscription.name} fetch Completed") }
+            httpClient.fetchAsFlow(feed.feedUrl)
+                .onCompletion { Log.d("InfoFlow", "${feed.feedName} fetch Completed") }
         }
 
-    private fun Flow<RssArticle>.asStorage(sourceName: String) =
+    private fun Flow<RssArticle>.asStorage(feedId: Int, sourceName: String) =
         map { article ->
-            Article.fromRss(article, sourceName)
+            Article.fromRss(article, feedId, sourceName)
         }
 
     override suspend fun load(
@@ -90,7 +90,7 @@ class ArticleRemoteMediator(
                 MediatorResult.Success(endOfPaginationReached = true)
             LoadType.REFRESH -> {
                 withContext(Dispatchers.IO) {
-                    fetchAllSubscriptions().collect {
+                    fetchAllFeeds().collect {
                         articleDao.insertAll(listOf(it))
                     }
                 }

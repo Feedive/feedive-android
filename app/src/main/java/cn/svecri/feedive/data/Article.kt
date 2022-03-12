@@ -13,12 +13,12 @@ import java.time.format.DateTimeParseException
 @Entity(
     tableName = "article",
     indices = [
-        Index(value = ["source_name", "sort_time"]),
+        Index(value = ["feed_id", "sort_time"]),
         Index(value = ["storage_key"], unique = true),
         Index(value = ["later_read", "sort_time"]),
         Index(value = ["has_read", "sort_time"]),
         Index(value = ["starred", "sort_time"]),
-        Index(value = ["source_name", "later_read", "has_read", "starred", "sort_time"]),
+        Index(value = ["feed_id", "later_read", "has_read", "starred", "sort_time"]),
     ]
 )
 data class Article(
@@ -38,7 +38,8 @@ data class Article(
     @ColumnInfo(name = "update_time") val updateTime: LocalDateTime = LocalDateTime.now(),
     @ColumnInfo(name = "sort_time") val sortTime: LocalDateTime,
     @ColumnInfo(name = "storage_key") val storageKey: String,
-    @ColumnInfo(name = "source_name") val sourceName: String, // todo: 之后需要转为sourceId
+    @ColumnInfo(name = "feed_id") val feedId: Int,
+    @ColumnInfo(name = "source_name") val sourceName: String,
     @ColumnInfo(name = "last_read_time") val lastReadTime: LocalDateTime? = null,
     @ColumnInfo(name = "has_read") val hasRead: Boolean = false,
     @ColumnInfo(name = "starred") val starred: Boolean = false,
@@ -55,7 +56,7 @@ data class Article(
         )
 
         // 使用前应过滤掉所有标题为空的文章
-        fun fromRss(article: RssArticle, sourceName: String) = run {
+        fun fromRss(article: RssArticle, feedId: Int, sourceName: String) = run {
             var pubDate: LocalDateTime? = null
             for (formatter in dateTimeFormatters) {
                 try {
@@ -94,6 +95,7 @@ data class Article(
                         )
                     )
                 },
+                feedId = feedId,
                 sourceName = sourceName,
                 lastReadTime = null,
                 starred = false,
