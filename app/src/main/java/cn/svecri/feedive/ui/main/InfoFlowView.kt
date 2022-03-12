@@ -84,18 +84,23 @@ class InfoFlowViewModel(application: Application) : AndroidViewModel(application
     private val appDatabase = AppDatabase.getInstance(application)
     private val articleDao = appDatabase.articleDao()
     val groupName by mutableStateOf("All")
+    var hasReadCondition by mutableStateOf(listOf(true, false))
+    var starredCondition by mutableStateOf(listOf(true, false))
+    var laterReadCondition by mutableStateOf(listOf(true, false))
+    var remoteFetchCondition =
+        ArticleRemoteMediator.FetchCondition(groupName, 5, ArticleRemoteMediator.RefreshType.REMOTE)
 
     @OptIn(ExperimentalPagingApi::class)
     val pager = Pager(
         PagingConfig(
             pageSize = 20,
         ),
-        remoteMediator = ArticleRemoteMediator(appDatabase, httpClient, groupName, 5)
+        remoteMediator = ArticleRemoteMediator(appDatabase, httpClient, remoteFetchCondition)
     ) {
         articleDao.queryArticles(
-            listOf(true, false),
-            listOf(true, false),
-            listOf(true, false),
+            hasReadCondition = hasReadCondition,
+            starredCondition = starredCondition,
+            laterReadCondition = laterReadCondition,
             groupName,
             5
         )
@@ -121,6 +126,14 @@ class InfoFlowViewModel(application: Application) : AndroidViewModel(application
                 ArticleInfoWithState(articleInfo)
             }
     }.cachedIn(viewModelScope)
+
+    fun toggleHasRead() {
+        hasReadCondition = if (hasReadCondition.size == 2) {
+            listOf(false)
+        } else {
+            listOf(true, false)
+        }
+    }
 
     fun updateArticleStarred(articleId: Int, starred: Boolean) {
         viewModelScope.launch {
@@ -152,14 +165,29 @@ fun InfoFlowView(vm: InfoFlowViewModel = viewModel(), navController: NavControll
 
     Scaffold(
         topBar = {
-            TopAppBarWithTab(groupName = groupName, onRefresh = { articles.refresh() }) {
+            TopAppBarWithTab(
+                groupName = groupName,
+                onRefresh = {
+                    vm.remoteFetchCondition.refreshType =
+                        ArticleRemoteMediator.RefreshType.REMOTE
+                    articles.refresh()
+                },
+                onToggleHasRead = {
+                    vm.toggleHasRead()
+                    vm.remoteFetchCondition.refreshType =
+                        ArticleRemoteMediator.RefreshType.NO_REMOTE
+                    articles.refresh()
+                }) {
                 groupName = it
             }
         }
     ) {
         SwipeRefresh(
             state = swipeRefreshState,
-            onRefresh = { articles.refresh() }
+            onRefresh = {
+                vm.remoteFetchCondition.refreshType = ArticleRemoteMediator.RefreshType.REMOTE
+                articles.refresh()
+            }
         ) {
             InfoFlowList(
                 articles,
@@ -236,6 +264,7 @@ fun InfoFlowList(
 fun TopAppBarWithTab(
     groupName: String,
     onRefresh: () -> Unit = {},
+    onToggleHasRead: () -> Unit = {},
     setGroupName: (String) -> Unit = {}
 ) {
     val groups = remember { listOf("All", "Computer") }
@@ -277,7 +306,7 @@ fun TopAppBarWithTab(
                     contentDescription = "Refresh Icon"
                 )
             }
-            IconButton(onClick = { /*TODO*/ }) {
+            IconButton(onClick = onToggleHasRead) {
                 Icon(
                     painter = painterResource(id = R.drawable.ic_email_read_24),
                     contentDescription = "Switch Read or Unread or all articles"
