@@ -5,6 +5,7 @@ import cn.svecri.feedive.model.*
 import org.w3c.dom.Document
 import org.w3c.dom.NodeList
 import java.io.EOFException
+import java.io.IOException
 import java.io.InputStream
 import javax.xml.parsers.DocumentBuilder
 import javax.xml.parsers.DocumentBuilderFactory
@@ -23,6 +24,9 @@ class RssParser {
             builder.parse(inputStream)
         } catch (e: EOFException) {
             Log.e("RssParser", "Parse RSS Error: EOF")
+            return null;
+        } catch (e: IOException) {
+            Log.e("RssParser", "Parse RSS Error: IOException")
             return null;
         }
         val xpath: XPath = xpathFactory.newXPath()
