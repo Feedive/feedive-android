@@ -8,7 +8,7 @@ import androidx.room.PrimaryKey
 data class Feed(
     @PrimaryKey(autoGenerate = true)
     @ColumnInfo(name = "feed_id")
-    val feed_id: Int,
+    val feedId: Int,
     @ColumnInfo(name = "feed_name")
     val feedName: String,
     @ColumnInfo(name = "feed_type")
