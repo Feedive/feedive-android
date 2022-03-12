@@ -21,6 +21,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.pointer.consumePositionChange
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -43,12 +44,16 @@ import cn.svecri.feedive.data.AppDatabase
 import cn.svecri.feedive.data.ArticleRemoteMediator
 import cn.svecri.feedive.ui.theme.FeediveTheme
 import cn.svecri.feedive.utils.HttpWrapper
+import coil.compose.AsyncImage
 import coil.compose.rememberImagePainter
+import coil.request.CachePolicy
+import coil.request.ImageRequest
+import coil.size.Scale
 import com.google.accompanist.swiperefresh.SwipeRefresh
 import com.google.accompanist.swiperefresh.rememberSwipeRefreshState
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
-import kotlinx.parcelize.IgnoredOnParcel
+import kotlinx.coroutines.launch
 import kotlinx.parcelize.Parcelize
 import java.time.Duration
 import java.time.LocalDateTime
@@ -64,15 +69,14 @@ data class ArticleInfo(
     val hasRead: Boolean = false,
     val protocol: String = "rss",
     val starred: Boolean = false,
+    val laterRead: Boolean = false,
     val link: String = "",
 ) : Parcelable
 
-@Parcelize
 class ArticleInfoWithState(
     val info: ArticleInfo,
-) : Parcelable {
-    @IgnoredOnParcel
-    val revealed: MutableState<Boolean> = mutableStateOf(false)
+) {
+//    val revealed: MutableState<Boolean> = mutableStateOf(initRevealed)
 }
 
 class InfoFlowViewModel(application: Application) : AndroidViewModel(application) {
@@ -109,6 +113,7 @@ class InfoFlowViewModel(application: Application) : AndroidViewModel(application
                     article.hasRead,
                     article.protocol,
                     article.starred,
+                    article.laterRead,
                     article.link,
                 )
             }
@@ -116,6 +121,24 @@ class InfoFlowViewModel(application: Application) : AndroidViewModel(application
                 ArticleInfoWithState(articleInfo)
             }
     }.cachedIn(viewModelScope)
+
+    fun updateArticleStarred(articleId: Int, starred: Boolean) {
+        viewModelScope.launch {
+            articleDao.updateArticleStarred(articleId, starred)
+        }
+    }
+
+    fun updateArticleHasRead(articleId: Int, hasRead: Boolean) {
+        viewModelScope.launch {
+            articleDao.updateArticleHasRead(articleId, hasRead)
+        }
+    }
+
+    fun updateArticleLaterRead(articleId: Int, laterRead: Boolean) {
+        viewModelScope.launch {
+            articleDao.updateArticleLaterRead(articleId, laterRead)
+        }
+    }
 }
 
 @Composable
@@ -141,7 +164,7 @@ fun InfoFlowView(vm: InfoFlowViewModel = viewModel(), navController: NavControll
             InfoFlowList(
                 articles,
                 offsetTop = with(LocalDensity.current) { swipeRefreshState.indicatorOffset.toDp() },
-                navController,
+                navController = navController,
             )
         }
     }
@@ -151,16 +174,15 @@ fun InfoFlowView(vm: InfoFlowViewModel = viewModel(), navController: NavControll
 fun InfoFlowList(
     articles: LazyPagingItems<ArticleInfoWithState>,
     offsetTop: Dp = 0f.dp,
-    navController: NavController
+    navController: NavController,
 ) {
     val listState = rememberLazyListState()
+    var revealedId by remember { mutableStateOf(-1) }
     val resetAllArticlesRevealState = {
         var anyRevealed = false
-        articles.itemSnapshotList.forEach { info ->
-            if (info?.revealed?.value == true) {
-                anyRevealed = true
-                info.revealed.value = false
-            }
+        if (revealedId >= 0) {
+            anyRevealed = true
+            revealedId = -1
         }
         anyRevealed
     }
@@ -169,12 +191,22 @@ fun InfoFlowList(
         state = listState,
         modifier = Modifier.offset(y = offsetTop)
     ) {
-        itemsIndexed(articles) { _, item ->
+        itemsIndexed(
+            items = articles,
+            key = { _, item ->
+                item.info.articleId
+            }
+        ) { _, item ->
             item?.let { articleInfoWithState ->
-                var isRevealed by articleInfoWithState.revealed
+                val isRevealed by
+                remember(key1 = articleInfoWithState.info.articleId) {
+                    derivedStateOf {
+                        articleInfoWithState.info.articleId == revealedId
+                    }
+                }
                 InteractiveArticleItem(
                     info = articleInfoWithState.info,
-                    isRevealed = isRevealed,
+                    isRevealed = articleInfoWithState.info.articleId == revealedId,
                     onClick = {
                         if (!resetAllArticlesRevealState()) {
                             Log.d("InfoFlow", "${articleInfoWithState.info.title} clicked")
@@ -185,12 +217,13 @@ fun InfoFlowList(
                     onExpand = {
                         if (!isRevealed && !resetAllArticlesRevealState()) {
                             Log.d("InfoFlow", "${articleInfoWithState.info.title} revealed")
-                            isRevealed = true
+                            revealedId = item.info.articleId
                         }
                     },
                     onCollapse = {
                         if (isRevealed) {
-                            isRevealed = false
+                            Log.d("InfoFlow", "${articleInfoWithState.info.title} collapse")
+                            revealedId = -1
                         }
                     },
                 )
@@ -256,6 +289,7 @@ fun TopAppBarWithTab(
 
 @Composable
 fun InteractiveArticleItem(
+    vm: InfoFlowViewModel = viewModel(),
     info: ArticleInfo,
     onClick: () -> Unit = {},
     isRevealed: Boolean = false,
@@ -266,8 +300,32 @@ fun InteractiveArticleItem(
         modifier = Modifier.fillMaxWidth(),
         isRevealed = isRevealed,
         cardOffset = 200.dp,
+        readText = if (!info.hasRead) {
+            "已读"
+        } else {
+            "未读"
+        },
+        starText = if (!info.starred) {
+            "收藏"
+        } else {
+            "取消收藏"
+        },
+        laterText = if (!info.laterRead) {
+            "稍后阅读"
+        } else {
+            "移除稍后阅读"
+        },
         onExpand = onExpand,
         onCollapse = onCollapse,
+        onStar = {
+            vm.updateArticleStarred(info.articleId, !info.starred)
+        },
+        onHasRead = {
+            vm.updateArticleHasRead(info.articleId, !info.hasRead)
+        },
+        onLaterRead = {
+            vm.updateArticleLaterRead(info.articleId, !info.laterRead)
+        },
     ) {
         ArticleDetailedItem(info, onClick = onClick)
     }
@@ -278,8 +336,14 @@ fun DraggableCardWithButton(
     modifier: Modifier = Modifier,
     isRevealed: Boolean,
     cardOffset: Dp,
+    readText: String = "已读",
+    starText: String = "收藏",
+    laterText: String = "稍后阅读",
     onExpand: () -> Unit,
     onCollapse: () -> Unit,
+    onHasRead: () -> Unit = {},
+    onStar: () -> Unit = {},
+    onLaterRead: () -> Unit = {},
     content: @Composable () -> Unit,
 ) {
     val actionButtonModifier = { width: Dp ->
@@ -297,21 +361,21 @@ fun DraggableCardWithButton(
         ) {
             Button(
                 modifier = actionButtonModifier(50.dp),
-                onClick = { /*TODO*/ }
+                onClick = onHasRead
             ) {
-                Text(text = "已读")
+                Text(text = readText)
             }
             Button(
                 modifier = actionButtonModifier(50.dp),
-                onClick = { /*TODO*/ }
+                onClick = onStar
             ) {
-                Text(text = "收藏")
+                Text(text = starText)
             }
             Button(
                 modifier = actionButtonModifier(100.dp),
-                onClick = { /*TODO*/ }
+                onClick = onLaterRead
             ) {
-                Text(text = "稍后阅读")
+                Text(text = laterText)
             }
         }
         DraggableCard(
@@ -419,14 +483,20 @@ fun ArticleDetailedItem(
                 )
             }
             if (info.picUrl.isNotEmpty()) {
-                Image(
+                AsyncImage(
+                    model = ImageRequest.Builder(LocalContext.current)
+                        .data(info.picUrl)
+                        .crossfade(true)
+                        .diskCacheKey(info.picUrl)
+                        .diskCachePolicy(CachePolicy.ENABLED)
+                        .size(200)
+                        .scale(Scale.FIT)
+                        .build(),
                     modifier = Modifier
                         .fillMaxHeight()
                         .width(120.dp),
-//                    painter = painterResource(id = R.drawable.placeholder),
-                    painter = rememberImagePainter(info.picUrl),
                     contentScale = ContentScale.Crop,
-                    contentDescription = "image"
+                    contentDescription = info.title
                 )
             }
         }

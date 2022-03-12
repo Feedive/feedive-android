@@ -1,10 +1,7 @@
 package cn.svecri.feedive.data
 
 import androidx.paging.PagingSource
-import androidx.room.Dao
-import androidx.room.Insert
-import androidx.room.OnConflictStrategy
-import androidx.room.Query
+import androidx.room.*
 
 @Dao
 interface ArticleDao {
@@ -26,4 +23,13 @@ interface ArticleDao {
 
     @Query("delete from article")
     suspend fun clearAll()
+
+    @Query("update article set starred=:starred where id=:articleId")
+    suspend fun updateArticleStarred(articleId: Int, starred: Boolean)
+
+    @Query("update article set has_read=:hasRead where id=:articleId")
+    suspend fun updateArticleHasRead(articleId: Int, hasRead: Boolean)
+
+    @Query("update article set later_read=:laterRead where id=:articleId")
+    suspend fun updateArticleLaterRead(articleId: Int, laterRead: Boolean)
 }
