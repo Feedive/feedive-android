@@ -1,6 +1,7 @@
 package cn.svecri.feedive.ui.main
 
 import android.app.Application
+import android.content.res.Resources
 import android.os.Parcelable
 import android.util.Log
 import androidx.compose.animation.core.MutableTransitionState
@@ -14,6 +15,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.*
+import androidx.compose.material.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -83,7 +85,7 @@ class InfoFlowViewModel(application: Application) : AndroidViewModel(application
     private val httpClient: HttpWrapper = HttpWrapper()
     private val appDatabase = AppDatabase.getInstance(application)
     private val articleDao = appDatabase.articleDao()
-    val groupName by mutableStateOf("All")
+    var groupName by mutableStateOf("All")
     var hasReadCondition by mutableStateOf(listOf(true, false))
     var starredCondition by mutableStateOf(listOf(true, false))
     var laterReadCondition by mutableStateOf(listOf(true, false))
@@ -161,12 +163,10 @@ fun InfoFlowView(vm: InfoFlowViewModel = viewModel(), navController: NavControll
     Log.d("InfoFlow", "Main View Recompose ${articles.loadState.refresh}")
     val swipeRefreshState = rememberSwipeRefreshState(isRefreshing = isRefreshing)
 
-    var groupName = vm.groupName
-
     Scaffold(
         topBar = {
             TopAppBarWithTab(
-                groupName = groupName,
+                groupName = vm.groupName,
                 onRefresh = {
                     vm.remoteFetchCondition.refreshType =
                         ArticleRemoteMediator.RefreshType.REMOTE
@@ -178,7 +178,7 @@ fun InfoFlowView(vm: InfoFlowViewModel = viewModel(), navController: NavControll
                         ArticleRemoteMediator.RefreshType.NO_REMOTE
                     articles.refresh()
                 }) {
-                groupName = it
+                vm.groupName = it
             }
         }
     ) {
@@ -277,7 +277,14 @@ fun TopAppBarWithTab(
         title = {
             ScrollableTabRow(
                 selectedTabIndex = tabIndex,
-                modifier = Modifier.fillMaxHeight()
+                modifier = Modifier.fillMaxHeight(),
+                indicator = { tabPositions ->
+                    TabRowDefaults.Indicator(
+                        color = MaterialTheme.colors.primaryVariant,
+                        height = 4.dp,
+                        modifier = Modifier.tabIndicatorOffset(tabPositions[tabIndex]),
+                    )
+                },
             ) {
                 for (group in groups) {
                     Tab(
