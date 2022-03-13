@@ -1,6 +1,7 @@
 package cn.svecri.feedive.ui.main
 
 import android.os.Bundle
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.height
@@ -16,10 +17,12 @@ import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavHostController
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
 import cn.svecri.feedive.R
 import cn.svecri.feedive.ui.theme.FeediveTheme
 
@@ -34,9 +37,15 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-sealed class BottomNavItem(var title: String, var icon: Int, var screenRoute: String) {
+sealed class BottomNavItem(
+    val title: String,
+    val icon: Int,
+    val screenRoute: String,
+    val optParameters: String = ""
+) {
 
-    object InfoFlow : BottomNavItem("Flow", R.drawable.ic_feeds, "info_flow")
+    object InfoFlow :
+        BottomNavItem("Flow", R.drawable.ic_feeds, "info_flow", "/{type}?detail={detail}")
 }
 
 @Composable
@@ -55,14 +64,31 @@ fun MainScreenView() {
 fun NavigationGraph(navController: NavHostController, bottomPadding: Dp) {
     NavHost(
         navController,
-        startDestination = BottomNavItem.InfoFlow.screenRoute,
+        startDestination = BottomNavItem.InfoFlow.screenRoute + "/{type}?detail={detail}",
         modifier = Modifier.padding(0.dp, 0.dp, 0.dp, bottomPadding),
     ) {
-        composable(BottomNavItem.InfoFlow.screenRoute) {
-            InfoFlowView(navController = navController)
+        Log.d(
+            "MainActivity",
+            BottomNavItem.InfoFlow.screenRoute + BottomNavItem.InfoFlow.optParameters,
+        )
+        composable(
+            BottomNavItem.InfoFlow.screenRoute + BottomNavItem.InfoFlow.optParameters,
+            arguments = listOf(
+                navArgument("type") { type = NavType.StringType
+                                    defaultValue = "all"},
+                navArgument("detail") { defaultValue = "0" })
+        ) {
+            InfoFlowView(
+                navController = navController,
+                type = ArticleFetchType.buildFromArgs(
+                    it.arguments?.getString("type"),
+                    it.arguments?.getString("detail"),
+                )
+            )
         }
-        composable("article?link={link}"){ backStackEntry ->
-            backStackEntry.arguments?.getString("link")?.let { ArticleView(it, navController = navController) }
+        composable("article?link={link}") { backStackEntry ->
+            backStackEntry.arguments?.getString("link")
+                ?.let { ArticleView(it, navController = navController) }
         }
     }
 }
@@ -83,9 +109,11 @@ fun BottomNavigationBar(navController: NavController) {
                     )
                 },
                 label = { Text(text = item.title) },
-                selected = currentDestination?.hierarchy?.any { it.route == item.screenRoute } == true,
+                selected = currentDestination?.hierarchy?.any {
+                    it.route?.split("/")?.get(0) == item.screenRoute
+                } == true,
                 onClick = {
-                    navController.navigate(item.screenRoute) {
+                    navController.navigate(item.screenRoute + "/all") {
                         navController.graph.startDestinationRoute?.let { screenRoute ->
                             popUpTo(screenRoute) {
                                 saveState = true

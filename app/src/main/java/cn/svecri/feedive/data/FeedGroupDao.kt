@@ -12,4 +12,7 @@ interface FeedGroupDao {
 
     @Query("select * from feed_group")
     fun getAll(): Flow<List<FeedGroup>>
+
+    @Query("select * from feed_group where feed_group_id = :groupId")
+    fun getById(groupId: Int): Flow<FeedGroup>
 }
