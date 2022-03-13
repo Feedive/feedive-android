@@ -1,7 +1,6 @@
 package cn.svecri.feedive.ui.main
 
 import android.app.Application
-import android.content.res.Resources
 import android.os.Parcelable
 import android.util.Log
 import androidx.compose.animation.core.MutableTransitionState
@@ -15,7 +14,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.*
-import androidx.compose.material.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -82,52 +80,15 @@ class ArticleInfoWithState(
 }
 
 class InfoFlowViewModel(application: Application) : AndroidViewModel(application) {
-    private val httpClient: HttpWrapper = HttpWrapper()
-    private val appDatabase = AppDatabase.getInstance(application)
-    private val articleDao = appDatabase.articleDao()
-    var groupName by mutableStateOf("All")
+    val httpClient: HttpWrapper = HttpWrapper()
+    val appDatabase = AppDatabase.getInstance(application)
+    val articleDao = appDatabase.articleDao()
+    val feedDao = appDatabase.feedDao()
+    val feedGroupDao = appDatabase.feedGroupDao()
+    var priority by mutableStateOf(5)
     var hasReadCondition by mutableStateOf(listOf(true, false))
     var starredCondition by mutableStateOf(listOf(true, false))
     var laterReadCondition by mutableStateOf(listOf(true, false))
-    var remoteFetchCondition =
-        ArticleRemoteMediator.FetchCondition(groupName, 5, ArticleRemoteMediator.RefreshType.REMOTE)
-
-    @OptIn(ExperimentalPagingApi::class)
-    val pager = Pager(
-        PagingConfig(
-            pageSize = 20,
-        ),
-        remoteMediator = ArticleRemoteMediator(appDatabase, httpClient, remoteFetchCondition)
-    ) {
-        articleDao.queryArticles(
-            hasReadCondition = hasReadCondition,
-            starredCondition = starredCondition,
-            laterReadCondition = laterReadCondition,
-            groupName,
-            5
-        )
-    }
-    val articleFlow = pager.flow.map {
-        it
-            .map { article ->
-                ArticleInfo(
-                    article.id,
-                    article.title,
-                    article.picUrl,
-                    article.sourceName,
-                    article.pubTime,
-                    article.description,
-                    article.hasRead,
-                    article.protocol,
-                    article.starred,
-                    article.laterRead,
-                    article.link,
-                )
-            }
-            .map { articleInfo ->
-                ArticleInfoWithState(articleInfo)
-            }
-    }.cachedIn(viewModelScope)
 
     fun toggleHasRead() {
         hasReadCondition = if (hasReadCondition.size == 2) {
@@ -156,9 +117,150 @@ class InfoFlowViewModel(application: Application) : AndroidViewModel(application
     }
 }
 
+sealed class ArticleFetchType {
+    object All : ArticleFetchType();
+    data class Group(val groupId: Int) : ArticleFetchType();
+    data class Feed(val feedId: Int) : ArticleFetchType();
+    object Starred : ArticleFetchType();
+    object LaterRead : ArticleFetchType();
+
+    fun intoRemoteFetchType(priority: Int?): ArticleRemoteMediator.RemoteFetchType {
+        return when (this) {
+            is All -> ArticleRemoteMediator.RemoteFetchType.All((priority ?: 5).coerceIn(1, 5))
+            is Group -> ArticleRemoteMediator.RemoteFetchType.Group(
+                groupId,
+                (priority ?: 5).coerceIn(1, 5)
+            )
+            is Feed -> ArticleRemoteMediator.RemoteFetchType.Feed(feedId)
+            else -> ArticleRemoteMediator.RemoteFetchType.None
+        }
+    }
+
+    companion object {
+        fun buildFromArgs(type: String?, detail: String?): ArticleFetchType {
+            when (type) {
+                "group" -> {
+                    when (detail?.toIntOrNull()) {
+                        is Int -> return Group(detail.toInt())
+                    }
+                }
+                "feed" -> {
+                    when (detail?.toIntOrNull()) {
+                        is Int -> return Feed(detail.toInt())
+                    }
+                }
+                "starred" -> return Starred
+                "laterRead" -> return LaterRead
+            }
+            return All
+        }
+    }
+}
+
 @Composable
-fun InfoFlowView(vm: InfoFlowViewModel = viewModel(), navController: NavController) {
-    val articles = vm.articleFlow.collectAsLazyPagingItems()
+fun InfoFlowView(
+    vm: InfoFlowViewModel = viewModel(),
+    type: ArticleFetchType,
+    navController: NavController
+) {
+
+    var flowType: ArticleFetchType by remember { mutableStateOf(type) }
+    var remoteFetchCondition = remember {
+        ArticleRemoteMediator.FetchCondition(
+            flowType.intoRemoteFetchType(vm.priority),
+            ArticleRemoteMediator.RefreshType.REMOTE
+        )
+    }
+    val title by remember {
+        when (flowType) {
+            is ArticleFetchType.All -> flowOf("All")
+            is ArticleFetchType.LaterRead -> flowOf("Later Read")
+            is ArticleFetchType.Starred -> flowOf("Star")
+            is ArticleFetchType.Group -> {
+                vm.feedGroupDao.getById((flowType as ArticleFetchType.Group).groupId)
+                    .map { it.feedGroupName }
+            }
+            is ArticleFetchType.Feed -> {
+                vm.feedDao.getFlowById((flowType as ArticleFetchType.Feed).feedId).map { it.feedName }
+            }
+        }
+    }.collectAsState(initial = "Unknown")
+
+    @OptIn(ExperimentalPagingApi::class)
+    val pager = Pager(
+        PagingConfig(
+            pageSize = 20,
+        ),
+        remoteMediator = ArticleRemoteMediator(vm.appDatabase, vm.httpClient, remoteFetchCondition)
+    ) {
+        when (flowType) {
+            is ArticleFetchType.All -> {
+                vm.articleDao.queryArticlesAll(
+                    hasReadCondition = vm.hasReadCondition,
+                    starredCondition = vm.starredCondition,
+                    laterReadCondition = vm.laterReadCondition,
+                    vm.priority
+                )
+            }
+            is ArticleFetchType.Group -> {
+                vm.articleDao.queryArticlesByGroup(
+                    hasReadCondition = vm.hasReadCondition,
+                    starredCondition = vm.starredCondition,
+                    laterReadCondition = vm.laterReadCondition,
+                    groupId = (flowType as ArticleFetchType.Group).groupId,
+                    vm.priority
+                )
+            }
+            is ArticleFetchType.Feed -> {
+                vm.articleDao.queryArticlesByFeed(
+                    hasReadCondition = vm.hasReadCondition,
+                    starredCondition = vm.starredCondition,
+                    laterReadCondition = vm.laterReadCondition,
+                    feedId = (flowType as ArticleFetchType.Feed).feedId,
+                    vm.priority
+                )
+            }
+            is ArticleFetchType.Starred -> {
+                vm.articleDao.queryArticlesAll(
+                    hasReadCondition = vm.hasReadCondition,
+                    starredCondition = listOf(true),
+                    laterReadCondition = vm.laterReadCondition,
+                    vm.priority
+                )
+            }
+            is ArticleFetchType.LaterRead -> {
+                vm.articleDao.queryArticlesAll(
+                    hasReadCondition = vm.hasReadCondition,
+                    starredCondition = vm.starredCondition,
+                    laterReadCondition = listOf(true),
+                    vm.priority
+                )
+            }
+        }
+    }
+    val articles = remember {
+        pager.flow.map {
+            it
+                .map { article ->
+                    ArticleInfo(
+                        article.id,
+                        article.title,
+                        article.picUrl,
+                        article.sourceName,
+                        article.pubTime,
+                        article.description,
+                        article.hasRead,
+                        article.protocol,
+                        article.starred,
+                        article.laterRead,
+                        article.link,
+                    )
+                }
+                .map { articleInfo ->
+                    ArticleInfoWithState(articleInfo)
+                }
+        }}.collectAsLazyPagingItems()
+
     val isRefreshing = articles.loadState.refresh == LoadState.Loading
     Log.d("InfoFlow", "Main View Recompose ${articles.loadState.refresh}")
     val swipeRefreshState = rememberSwipeRefreshState(isRefreshing = isRefreshing)
@@ -166,26 +268,24 @@ fun InfoFlowView(vm: InfoFlowViewModel = viewModel(), navController: NavControll
     Scaffold(
         topBar = {
             TopAppBarWithTab(
-                groupName = vm.groupName,
+                title = title,
                 onRefresh = {
-                    vm.remoteFetchCondition.refreshType =
+                    remoteFetchCondition.refreshType =
                         ArticleRemoteMediator.RefreshType.REMOTE
                     articles.refresh()
                 },
                 onToggleHasRead = {
                     vm.toggleHasRead()
-                    vm.remoteFetchCondition.refreshType =
+                    remoteFetchCondition.refreshType =
                         ArticleRemoteMediator.RefreshType.NO_REMOTE
                     articles.refresh()
-                }) {
-                vm.groupName = it
-            }
+                })
         }
     ) {
         SwipeRefresh(
             state = swipeRefreshState,
             onRefresh = {
-                vm.remoteFetchCondition.refreshType = ArticleRemoteMediator.RefreshType.REMOTE
+                remoteFetchCondition.refreshType = ArticleRemoteMediator.RefreshType.REMOTE
                 articles.refresh()
             }
         ) {
@@ -262,40 +362,13 @@ fun InfoFlowList(
 
 @Composable
 fun TopAppBarWithTab(
-    groupName: String,
+    title: String,
     onRefresh: () -> Unit = {},
-    onToggleHasRead: () -> Unit = {},
-    setGroupName: (String) -> Unit = {}
+    onToggleHasRead: () -> Unit = {}
 ) {
-    val groups = remember { listOf("All", "Computer") }
-    var tabIndex = groups.indexOf(groupName)
-    if (tabIndex < 0) {
-        tabIndex = 0
-        setGroupName(groups[0])
-    }
     TopAppBar(
         title = {
-            ScrollableTabRow(
-                selectedTabIndex = tabIndex,
-                modifier = Modifier.fillMaxHeight(),
-                indicator = { tabPositions ->
-                    TabRowDefaults.Indicator(
-                        color = MaterialTheme.colors.primaryVariant,
-                        height = 4.dp,
-                        modifier = Modifier.tabIndicatorOffset(tabPositions[tabIndex]),
-                    )
-                },
-            ) {
-                for (group in groups) {
-                    Tab(
-                        selected = true,
-                        modifier = Modifier.fillMaxHeight(),
-                        onClick = { setGroupName(group) }
-                    ) {
-                        Text(text = group)
-                    }
-                }
-            }
+            Text(text = title)
         },
         actions = {
             IconButton(onClick = { /*TODO*/ }) {
@@ -570,15 +643,15 @@ fun ArticleAbstractItem(info: ArticleInfo) {
         }
     }
 }
-
-@Preview(showBackground = true, group = "Overview")
-@Composable
-fun PreviewHomeInfoFlow() {
-    val navController = rememberNavController()
-    FeediveTheme {
-        InfoFlowView(navController = navController)
-    }
-}
+//
+//@Preview(showBackground = true, group = "Overview")
+//@Composable
+//fun PreviewHomeInfoFlow() {
+//    val navController = rememberNavController()
+//    FeediveTheme {
+//        InfoFlowView(navController = navController)
+//    }
+//}
 
 @Preview(showBackground = true, group = "Item")
 @Composable

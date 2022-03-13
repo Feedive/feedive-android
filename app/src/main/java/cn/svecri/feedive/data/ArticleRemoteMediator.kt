@@ -23,27 +23,46 @@ class ArticleRemoteMediator(
         NO_REMOTE,
     }
 
+    sealed class RemoteFetchType {
+        class All(val sourcePriority: Int) : RemoteFetchType()
+        class Group(val groupId: Int, val sourcePriority: Int) : RemoteFetchType()
+        class Feed(val feedId: Int) : RemoteFetchType()
+        object None : RemoteFetchType()
+    }
+
     class FetchCondition(
-        var groupName: String,
-        var sourcePriority: Int,
-        var refreshType: ArticleRemoteMediator.RefreshType = RefreshType.REMOTE,)
+        var remoteFetchType: RemoteFetchType,
+        var refreshType: RefreshType = RefreshType.REMOTE,
+    )
 
     private val articleDao: ArticleDao = database.articleDao()
+    private val feedDao: FeedDao = database.feedDao()
 
-    private fun feeds(): List<Feed> {
-        return arrayListOf(
-            Feed(
-                0, "笔吧评测室", "rss",
-                "http://feedive.app.cloudendpoint.cn/rss/wechat?id=611ce7048fae751e2363fc8b",
-                1,
-            ),
-            Feed(1, "Imobile", "rss",  "http://news.imobile.com.cn/rss/news.xml", 2),
-            Feed(1, "Sample",  "rss", "https://www.rssboard.org/files/sample-rss-2.xml", 4),
-        )
+    private fun feeds(): Flow<Feed> {
+        return when (fetchCondition.remoteFetchType) {
+            is RemoteFetchType.None -> flowOf()
+            is RemoteFetchType.Feed -> {
+                flow { emit(feedDao.getById((fetchCondition.remoteFetchType as RemoteFetchType.Feed).feedId)) }
+            }
+            is RemoteFetchType.Group -> {
+                val group = fetchCondition.remoteFetchType as RemoteFetchType.Group
+                flow { emit(feedDao.getByGroupId(group.groupId)) }
+                    .flatMapConcat { it.asFlow() }
+                    .filter { feed -> feed.feedPriority <= group.sourcePriority }
+            }
+            is RemoteFetchType.All -> {
+                val all = fetchCondition.remoteFetchType as RemoteFetchType.All
+                flow { emit(feedDao.getAllFeeds()) }
+                    .flatMapConcat {
+                        it.asFlow()
+                    }
+                    .filter { feed -> feed.feedPriority <= all.sourcePriority }
+            }
+        }
     }
 
     private fun fetchAllFeeds() = run {
-        feeds().asFlow()
+        feeds()
             .onEach {
                 Log.d("InfoFlow", "${it.feedName} Flow Start: ${Thread.currentThread().name}")
             }

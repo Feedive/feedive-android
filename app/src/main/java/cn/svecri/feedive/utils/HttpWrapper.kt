@@ -10,7 +10,7 @@ import java.time.Duration
 
 class HttpWrapper {
     private val httpClient: OkHttpClient = OkHttpClient.Builder()
-        .callTimeout(Duration.ofMillis(2000))
+        .callTimeout(Duration.ofMillis(10000))
         .readTimeout(Duration.ofMillis(5000))
         .build()
 

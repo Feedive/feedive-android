@@ -6,7 +6,10 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
 import androidx.sqlite.db.SupportSQLiteDatabase
+import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.WorkManager
 import cn.svecri.feedive.utils.DATABASE_NAME
+import cn.svecri.feedive.workers.FeedWorker
 
 
 @Database(
@@ -37,6 +40,9 @@ abstract class AppDatabase : RoomDatabase() {
                     object : RoomDatabase.Callback() {
                         override fun onCreate(db: SupportSQLiteDatabase) {
                             super.onCreate(db)
+                            val request = OneTimeWorkRequestBuilder<FeedWorker>()
+                                .build()
+                            WorkManager.getInstance(context).enqueue(request)
                         }
                     }
                 )
