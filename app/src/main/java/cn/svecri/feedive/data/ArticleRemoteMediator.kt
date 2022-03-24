@@ -17,6 +17,7 @@ class ArticleRemoteMediator(
     private val database: AppDatabase,
     private val httpClient: HttpWrapper,
     private val fetchCondition: FetchCondition,
+    private val onFetchFinished: suspend (Feed, Throwable?) -> Unit = { _, _ -> },
 ) : RemoteMediator<Int, Article>() {
     enum class RefreshType {
         REMOTE,
@@ -67,7 +68,9 @@ class ArticleRemoteMediator(
                 Log.d("InfoFlow", "${it.feedName} Flow Start: ${Thread.currentThread().name}")
             }
             .flatMapMerge { feed ->
-                fetchFeedArticleInfo(feed)
+                fetchFeedArticleInfo(feed).onCompletion {
+                    onFetchFinished(feed, it)
+                }
             }
     }
 

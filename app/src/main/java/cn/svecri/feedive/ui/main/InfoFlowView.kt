@@ -19,12 +19,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.RectangleShape
-import androidx.compose.ui.graphics.TransformOrigin
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.consumePositionChange
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
@@ -170,8 +167,10 @@ sealed class ArticleFetchType {
 fun InfoFlowView(
     vm: InfoFlowViewModel = viewModel(),
     type: ArticleFetchType,
+    snackbarHostState: SnackbarHostState,
     navController: NavController
 ) {
+    val scope = rememberCoroutineScope()
 
     val flowType: ArticleFetchType by remember { mutableStateOf(type) }
     val remoteFetchCondition = remember {
@@ -201,7 +200,13 @@ fun InfoFlowView(
         PagingConfig(
             pageSize = 20,
         ),
-        remoteMediator = ArticleRemoteMediator(vm.appDatabase, vm.httpClient, remoteFetchCondition)
+        remoteMediator = ArticleRemoteMediator(
+            vm.appDatabase,
+            vm.httpClient,
+            remoteFetchCondition
+        ) { feed, throwable ->
+            if (throwable != null) snackbarHostState.showSnackbar("${feed.feedName} Finished With Error: ${throwable.message}")
+        }
     ) {
         when (flowType) {
             is ArticleFetchType.All -> {
@@ -271,8 +276,6 @@ fun InfoFlowView(
                 }
         }
     }.collectAsLazyPagingItems()
-
-    val scope = rememberCoroutineScope()
     val setAllHasRead = suspend {
         when (flowType) {
             is ArticleFetchType.All -> {
@@ -563,7 +566,7 @@ fun DropdownSlide(
                 Slider(
                     modifier = modifier,
                     value = value.toFloat(),
-                    onValueChange = { onValueChange((it+0.49).toInt()) },
+                    onValueChange = { onValueChange((it + 0.49).toInt()) },
                     valueRange = 1f..5f,
                     steps = 1,
                     onValueChangeFinished = onValueChangeFinished

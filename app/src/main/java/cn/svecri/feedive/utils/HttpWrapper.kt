@@ -2,7 +2,9 @@ package cn.svecri.feedive.utils
 
 import android.util.Log
 import kotlinx.coroutines.cancel
-import kotlinx.coroutines.channels.*
+import kotlinx.coroutines.channels.awaitClose
+import kotlinx.coroutines.channels.onFailure
+import kotlinx.coroutines.channels.onSuccess
 import kotlinx.coroutines.flow.callbackFlow
 import okhttp3.*
 import java.io.IOException
@@ -36,7 +38,7 @@ class HttpWrapper {
             }
 
             override fun onFailure(call: Call, e: IOException) {
-                cancel("okhttp error", e)
+                cancel(e.message ?: "okhttp error", e)
             }
         })
         awaitClose { }
