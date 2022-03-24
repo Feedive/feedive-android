@@ -7,7 +7,6 @@ import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.updateTransition
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.*
@@ -50,7 +49,6 @@ import cn.svecri.feedive.data.ArticleRemoteMediator
 import cn.svecri.feedive.ui.theme.FeediveTheme
 import cn.svecri.feedive.utils.HttpWrapper
 import coil.compose.AsyncImage
-import coil.compose.rememberImagePainter
 import coil.request.CachePolicy
 import coil.request.ImageRequest
 import coil.size.Scale
@@ -760,7 +758,7 @@ fun DraggableCard(
                         onCollapse()
                         return@detectHorizontalDragGestures
                     }
-                    if (dragAmount < 0){
+                    if (dragAmount < 0) {
                         change.consumePositionChange()
                     }
                     offsetX.value = newValue.x
