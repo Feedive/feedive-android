@@ -68,12 +68,15 @@ fun MainScreenView() {
             })
         },
     ) {
-        NavigationGraph(navController, it.calculateBottomPadding())
+        NavigationGraph(navController, scaffoldState.snackbarHostState, it.calculateBottomPadding())
     }
 }
 
 @Composable
-fun NavigationGraph(navController: NavHostController, bottomPadding: Dp) {
+fun NavigationGraph(
+    navController: NavHostController,
+    snackbarHostState: SnackbarHostState, bottomPadding: Dp
+) {
     NavHost(
         navController,
         startDestination = BottomNavItem.InfoFlow.screenRoute + "/{type}?detail={detail}",
@@ -97,7 +100,8 @@ fun NavigationGraph(navController: NavHostController, bottomPadding: Dp) {
                 type = ArticleFetchType.buildFromArgs(
                     it.arguments?.getString("type"),
                     it.arguments?.getString("detail"),
-                )
+                ),
+                snackbarHostState = snackbarHostState,
             )
         }
         composable("article?link={link}") { backStackEntry ->
