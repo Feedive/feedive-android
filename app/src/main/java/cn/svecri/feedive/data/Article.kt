@@ -13,12 +13,12 @@ import java.time.format.DateTimeParseException
 @Entity(
     tableName = "article",
     indices = [
-        Index(value = ["feed_id", "sort_time"]),
+        Index(value = ["feed_id", "sort_time", "id"]),
         Index(value = ["storage_key"], unique = true),
-        Index(value = ["later_read", "sort_time"]),
-        Index(value = ["has_read", "sort_time"]),
-        Index(value = ["starred", "sort_time"]),
-        Index(value = ["feed_id", "later_read", "has_read", "starred", "sort_time"]),
+        Index(value = ["later_read", "sort_time", "id"]),
+        Index(value = ["has_read", "sort_time", "id"]),
+        Index(value = ["starred", "sort_time", "id"]),
+        Index(value = ["feed_id", "later_read", "has_read", "starred", "sort_time", "id"]),
     ]
 )
 data class Article(

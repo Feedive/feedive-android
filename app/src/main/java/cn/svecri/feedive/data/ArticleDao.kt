@@ -13,7 +13,7 @@ interface ArticleDao {
             "where article.has_read in (:hasReadCondition) " +
             "and article.starred in (:starredCondition) " +
             "and article.later_read in (:laterReadCondition) and feed.feed_priority <= :sourcePriority " +
-            "order by article.sort_time desc")
+            "order by article.sort_time desc, article.id desc")
     fun queryArticlesAll(
         hasReadCondition: List<Boolean>,
         starredCondition: List<Boolean>,
@@ -27,7 +27,7 @@ interface ArticleDao {
             "where article.has_read in (:hasReadCondition) " +
             "and article.starred in (:starredCondition) " +
             "and article.later_read in (:laterReadCondition) and feed_in_group.feed_group_id = :groupId and feed.feed_priority <= :sourcePriority " +
-            "order by article.sort_time desc")
+            "order by article.sort_time desc, article.id desc")
     fun queryArticlesByGroup(
         hasReadCondition: List<Boolean>,
         starredCondition: List<Boolean>,
@@ -41,7 +41,7 @@ interface ArticleDao {
             "where article.has_read in (:hasReadCondition) " +
             "and article.starred in (:starredCondition) " +
             "and article.later_read in (:laterReadCondition) and article.feed_id = :feedId and feed.feed_priority <= :sourcePriority " +
-            "order by article.sort_time desc")
+            "order by article.sort_time desc, article.id desc")
     fun queryArticlesByFeed(
         hasReadCondition: List<Boolean>,
         starredCondition: List<Boolean>,
