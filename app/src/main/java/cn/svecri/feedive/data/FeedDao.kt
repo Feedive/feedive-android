@@ -33,13 +33,15 @@ interface FeedDao {
     fun getAllFeedsFlow(): Flow<List<Feed>>
 
     @Query("select * from feed where feed_id = :feedId")
-    suspend fun getById(feedId: Int) : Feed
+    suspend fun getById(feedId: Int): Feed
 
     @Query("select * from feed where feed_id = :feedId")
-    fun getFlowById(feedId: Int) : Flow<Feed>
+    fun getFlowById(feedId: Int): Flow<Feed>
 
-    @Query("select feed.* from feed " +
-            "inner join feed_in_group on feed.feed_id = feed_in_group.feed_id " +
-            "where feed_in_group.feed_group_id = :groupId")
-    suspend fun getByGroupId(groupId: Int) : List<Feed>
+    @Query(
+        "select feed.* from feed " +
+                "inner join feed_in_group on feed.feed_id = feed_in_group.feed_id " +
+                "where feed_in_group.feed_group_id = :groupId"
+    )
+    suspend fun getByGroupId(groupId: Int): List<Feed>
 }
