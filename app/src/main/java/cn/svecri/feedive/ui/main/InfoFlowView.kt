@@ -59,6 +59,7 @@ import coil.request.ImageRequest
 import coil.size.Scale
 import com.google.accompanist.swiperefresh.SwipeRefresh
 import com.google.accompanist.swiperefresh.rememberSwipeRefreshState
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
@@ -172,8 +173,8 @@ fun InfoFlowView(
     navController: NavController
 ) {
 
-    var flowType: ArticleFetchType by remember { mutableStateOf(type) }
-    var remoteFetchCondition = remember {
+    val flowType: ArticleFetchType by remember { mutableStateOf(type) }
+    val remoteFetchCondition = remember {
         ArticleRemoteMediator.FetchCondition(
             flowType.intoRemoteFetchType(vm.priority),
             ArticleRemoteMediator.RefreshType.REMOTE
@@ -271,6 +272,49 @@ fun InfoFlowView(
         }
     }.collectAsLazyPagingItems()
 
+    val scope = rememberCoroutineScope()
+    val setAllHasRead = suspend {
+        when (flowType) {
+            is ArticleFetchType.All -> {
+                vm.articleDao.setArticlesHasRead(
+                    starredCondition = vm.starredCondition,
+                    laterReadCondition = vm.laterReadCondition,
+                    vm.priority
+                )
+            }
+            is ArticleFetchType.Group -> {
+                vm.articleDao.setArticlesHasReadByGroup(
+                    starredCondition = vm.starredCondition,
+                    laterReadCondition = vm.laterReadCondition,
+                    groupId = (flowType as ArticleFetchType.Group).groupId,
+                    vm.priority
+                )
+            }
+            is ArticleFetchType.Feed -> {
+                vm.articleDao.setArticlesHasReadByFeed(
+                    starredCondition = vm.starredCondition,
+                    laterReadCondition = vm.laterReadCondition,
+                    feedId = (flowType as ArticleFetchType.Feed).feedId,
+                    vm.priority
+                )
+            }
+            is ArticleFetchType.Starred -> {
+                vm.articleDao.setArticlesHasRead(
+                    starredCondition = listOf(true),
+                    laterReadCondition = vm.laterReadCondition,
+                    vm.priority
+                )
+            }
+            is ArticleFetchType.LaterRead -> {
+                vm.articleDao.setArticlesHasRead(
+                    starredCondition = vm.starredCondition,
+                    laterReadCondition = listOf(true),
+                    vm.priority
+                )
+            }
+        }
+    }
+
     val isRefreshing = articles.loadState.refresh == LoadState.Loading
     Log.d("InfoFlow", "Main View Recompose ${articles.loadState.refresh}")
     val swipeRefreshState = rememberSwipeRefreshState(isRefreshing = isRefreshing)
@@ -279,6 +323,7 @@ fun InfoFlowView(
         topBar = {
             TopAppBarWithTab(
                 title = title,
+                hasReadCondition = vm.hasReadCondition,
                 priority = vm.priority,
                 onPriorityChange = {
                     vm.priority = it
@@ -296,7 +341,13 @@ fun InfoFlowView(
                     remoteFetchCondition.refreshType =
                         ArticleRemoteMediator.RefreshType.NO_REMOTE
                     articles.refresh()
-                })
+                },
+                onSetAllHasRead = {
+                    scope.launch(Dispatchers.IO) {
+                        setAllHasRead()
+                    }
+                }
+            )
         }
     ) {
         SwipeRefresh(
@@ -381,9 +432,11 @@ fun InfoFlowList(
 fun TopAppBarWithTab(
     title: String,
     priority: Int = 5,
+    hasReadCondition: List<Boolean> = listOf(true, false),
     onPriorityChange: (Int) -> Unit = {},
     onRefresh: () -> Unit = {},
-    onToggleHasRead: () -> Unit = {}
+    onToggleHasRead: () -> Unit = {},
+    onSetAllHasRead: () -> Unit = {},
 ) {
     var priorityDisplay: Int by remember {
         mutableStateOf(priority)
@@ -419,8 +472,21 @@ fun TopAppBarWithTab(
                 )
             }
             IconButton(onClick = onToggleHasRead) {
+                Column(
+                    modifier = Modifier.width(40.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    if (hasReadCondition.contains(true)) {
+                        Text(text = "全部", fontSize = 14.sp)
+                    } else {
+                        Text(text = "未读", fontSize = 14.sp)
+                    }
+                }
+            }
+            IconButton(onClick = onSetAllHasRead) {
                 Icon(
                     painter = painterResource(id = R.drawable.ic_email_read_24),
+                    modifier = Modifier.size(24.dp),
                     contentDescription = "Switch Read or Unread or all articles"
                 )
             }
