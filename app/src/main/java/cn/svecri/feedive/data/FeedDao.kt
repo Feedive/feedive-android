@@ -29,6 +29,9 @@ interface FeedDao {
     @Query("select * from feed")
     suspend fun getAllFeeds(): List<Feed>
 
+    @Query("select * from feed")
+    fun getAllFeedsFlow(): Flow<List<Feed>>
+
     @Query("select * from feed where feed_id = :feedId")
     suspend fun getById(feedId: Int) : Feed
 

@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.tooling.preview.Preview
@@ -25,6 +26,7 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import cn.svecri.feedive.R
 import cn.svecri.feedive.ui.theme.FeediveTheme
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -51,10 +53,20 @@ sealed class BottomNavItem(
 @Composable
 fun MainScreenView() {
     val navController = rememberNavController()
+    val scaffoldState = rememberScaffoldState()
+    val scope = rememberCoroutineScope()
     // A surface container using the 'background' color from the theme
     Scaffold(
+        scaffoldState = scaffoldState,
         backgroundColor = MaterialTheme.colors.background,
-        bottomBar = { BottomNavigationBar(navController) }
+        bottomBar = { BottomNavigationBar(navController) },
+        drawerContent = {
+            NavigationDrawer(navController, afterNav = {
+                scope.launch {
+                    scaffoldState.drawerState.close()
+                }
+            })
+        },
     ) {
         NavigationGraph(navController, it.calculateBottomPadding())
     }
@@ -74,8 +86,10 @@ fun NavigationGraph(navController: NavHostController, bottomPadding: Dp) {
         composable(
             BottomNavItem.InfoFlow.screenRoute + BottomNavItem.InfoFlow.optParameters,
             arguments = listOf(
-                navArgument("type") { type = NavType.StringType
-                                    defaultValue = "all"},
+                navArgument("type") {
+                    type = NavType.StringType
+                    defaultValue = "all"
+                },
                 navArgument("detail") { defaultValue = "0" })
         ) {
             InfoFlowView(
