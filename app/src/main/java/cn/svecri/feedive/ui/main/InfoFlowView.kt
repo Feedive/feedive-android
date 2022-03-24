@@ -19,9 +19,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.consumePositionChange
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
@@ -31,9 +34,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.tooling.preview.Preview
-import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import androidx.compose.ui.unit.*
+import androidx.compose.ui.window.Popup
+import androidx.compose.ui.window.PopupPositionProvider
+import androidx.compose.ui.window.PopupProperties
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -275,6 +279,13 @@ fun InfoFlowView(
         topBar = {
             TopAppBarWithTab(
                 title = title,
+                priority = vm.priority,
+                onPriorityChange = {
+                    vm.priority = it
+                    remoteFetchCondition.refreshType =
+                        ArticleRemoteMediator.RefreshType.NO_REMOTE
+                    articles.refresh()
+                },
                 onRefresh = {
                     remoteFetchCondition.refreshType =
                         ArticleRemoteMediator.RefreshType.REMOTE
@@ -369,23 +380,38 @@ fun InfoFlowList(
 @Composable
 fun TopAppBarWithTab(
     title: String,
+    priority: Int = 5,
+    onPriorityChange: (Int) -> Unit = {},
     onRefresh: () -> Unit = {},
     onToggleHasRead: () -> Unit = {}
 ) {
+    var priorityDisplay: Int by remember {
+        mutableStateOf(priority)
+    }
+    var prioritySlideRevealed by remember {
+        mutableStateOf(false)
+    }
     TopAppBar(
         title = {
             Text(text = title)
         },
         actions = {
-            IconButton(onClick = { /*TODO*/ }) {
+            IconButton(onClick = { prioritySlideRevealed = true }) {
                 Column(
                     modifier = Modifier.width(40.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Text(text = "PRIOR", fontSize = 9.sp)
-                    Text(text = "4", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                    Text(text = "$priorityDisplay", fontSize = 16.sp, fontWeight = FontWeight.Bold)
                 }
             }
+            DropdownSlide(
+                modifier = Modifier.width(150.dp),
+                value = priorityDisplay,
+                onValueChange = { priorityDisplay = it },
+                onValueChangeFinished = { onPriorityChange(priorityDisplay) },
+                expand = prioritySlideRevealed,
+                onDismissRequest = { prioritySlideRevealed = false })
             IconButton(onClick = onRefresh) {
                 Icon(
                     painter = painterResource(id = R.drawable.ic_baseline_refresh_24),
@@ -400,6 +426,85 @@ fun TopAppBarWithTab(
             }
         }
     )
+}
+
+@Composable
+fun DropdownSlide(
+    value: Int,
+    expand: Boolean,
+    modifier: Modifier = Modifier,
+    onValueChange: (Int) -> Unit = {},
+    onValueChangeFinished: () -> Unit = {},
+    onDismissRequest: () -> Unit,
+    offset: DpOffset = DpOffset(0.dp, 0.dp),
+    properties: PopupProperties = PopupProperties(focusable = true),
+) {
+    val expandedStates = remember {
+        MutableTransitionState(false)
+    }.apply { targetState = expand }
+    val density = LocalDensity.current
+
+    val popupPositionProvider = remember {
+        object : PopupPositionProvider {
+            override fun calculatePosition(
+                anchorBounds: IntRect,
+                windowSize: IntSize,
+                layoutDirection: LayoutDirection,
+                popupContentSize: IntSize
+            ): IntOffset {
+                val contentOffsetX = with(density) { offset.x.roundToPx() }
+                val contentOffsetY = with(density) { offset.y.roundToPx() }
+
+                val toLeft = anchorBounds.left + contentOffsetX
+                val toRight = anchorBounds.right - contentOffsetX - popupContentSize.width
+                val toDisplayLeft = windowSize.width - popupContentSize.width
+                val toDisplayRight = 0
+                val x = if (layoutDirection == LayoutDirection.Ltr) {
+                    sequenceOf(
+                        toLeft,
+                        toRight,
+                        if (anchorBounds.left >= 0) toDisplayLeft else toDisplayRight
+                    )
+                } else {
+                    sequenceOf(
+                        toRight,
+                        toLeft,
+                        if (anchorBounds.right <= windowSize.width) toDisplayRight else toDisplayLeft
+                    )
+                }.firstOrNull {
+                    it >= 0 && it + popupContentSize.width <= windowSize.width
+                } ?: toRight
+                val toBottom = anchorBounds.bottom + contentOffsetY
+                val toTop = anchorBounds.top - contentOffsetY - popupContentSize.height
+                val toCenter = anchorBounds.top - popupContentSize.height / 2
+                val toDisplayBottom = windowSize.height - popupContentSize.height
+                val y = sequenceOf(toBottom, toTop, toCenter, toDisplayBottom).firstOrNull {
+                    it >= 0 &&
+                            it + popupContentSize.height <= windowSize.height
+                } ?: toTop
+                return IntOffset(x, y)
+            }
+        }
+    }
+
+    if (expandedStates.currentState || expandedStates.targetState) {
+        Popup(
+            onDismissRequest = onDismissRequest,
+            popupPositionProvider = popupPositionProvider,
+            properties = properties
+        ) {
+            Surface {
+                Slider(
+                    modifier = modifier,
+                    value = value.toFloat(),
+                    onValueChange = { onValueChange((it+0.49).toInt()) },
+                    valueRange = 1f..5f,
+                    steps = 1,
+                    onValueChangeFinished = onValueChangeFinished
+                )
+            }
+        }
+    }
 }
 
 @Composable
