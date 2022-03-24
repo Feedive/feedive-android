@@ -636,7 +636,8 @@ fun DraggableCardWithButton(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .matchParentSize()
+                .matchParentSize(),
+            horizontalArrangement = Arrangement.End
         ) {
             Button(
                 modifier = actionButtonModifier(buttonWidth),
@@ -707,7 +708,7 @@ fun DraggableCardWithButton(
         }
         DraggableCard(
             isRevealed = isRevealed,
-            cardOffset = cardOffset,
+            cardOffset = -cardOffset,
             onExpand = onExpand,
             onCollapse = onCollapse,
             content = content
@@ -751,15 +752,17 @@ fun DraggableCard(
                 detectHorizontalDragGestures { change, dragAmount ->
                     val original = Offset(offsetX.value, 0f)
                     val summed = original + Offset(x = dragAmount, y = 0f)
-                    val newValue = Offset(summed.x.coerceIn(0f, cardOffsetValue), 0f)
-                    if (newValue.x >= 10) {
+                    val newValue = Offset(summed.x.coerceIn(cardOffsetValue, 0f), 0f)
+                    if (newValue.x <= -10) {
                         onExpand()
                         return@detectHorizontalDragGestures
-                    } else if (newValue.x <= 0) {
+                    } else if (newValue.x >= 0) {
                         onCollapse()
                         return@detectHorizontalDragGestures
                     }
-                    change.consumePositionChange()
+                    if (dragAmount < 0){
+                        change.consumePositionChange()
+                    }
                     offsetX.value = newValue.x
                 }
             },
@@ -837,38 +840,7 @@ fun ArticleDetailedItem(
     }
 }
 
-@Composable
-fun ArticleAbstractItem(info: ArticleInfo) {
-    Surface(
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Row(
-            modifier = Modifier
-                .height(IntrinsicSize.Max)
-                .padding(start = 20.dp, top = 5.dp, bottom = 5.dp, end = 10.dp),
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            Column(
-                modifier = Modifier
-                    .weight(1f)
-            ) {
-                Text(text = info.title, fontSize = 14.sp)
-            }
-            if (info.picUrl.isNotEmpty()) {
-                Image(
-                    modifier = Modifier
-                        .fillMaxHeight()
-                        .width(90.dp),
-//                    painter = painterResource(id = R.drawable.placeholder),
-                    painter = rememberImagePainter(info.picUrl),
-                    contentScale = ContentScale.Crop,
-                    contentDescription = "image"
-                )
-            }
-        }
-    }
-}
-//
+
 //@Preview(showBackground = true, group = "Overview")
 //@Composable
 //fun PreviewHomeInfoFlow() {
