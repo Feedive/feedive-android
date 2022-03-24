@@ -121,13 +121,44 @@ class InfoFlowViewModel(application: Application) : AndroidViewModel(application
     }
 }
 
+/**
+ * An Enum Class used to represent Article Flow fetching type.
+ * The Class usually built from args in Navigation Route.
+ */
 sealed class ArticleFetchType {
+    /**
+     * Fetch Articles from All feeds saved locally.
+     */
     object All : ArticleFetchType()
+
+    /**
+     * Fetch Articles from feeds in specific group.
+     * @param groupId: id of feed group
+     */
     data class Group(val groupId: Int) : ArticleFetchType()
+
+    /**
+     * Fetch Articles from specific feed
+     * @param feedId: id of feed
+     */
     data class Feed(val feedId: Int) : ArticleFetchType()
+
+    /**
+     * Fetch all Saved Articles which has been starred.
+     */
     object Starred : ArticleFetchType()
+
+    /**
+     * Fetch all Saved Articles which has been marked as LaterRead.
+     */
     object LaterRead : ArticleFetchType()
 
+    /**
+     * Make a new RemoteFetchType used in RemoteMediator.
+     * @param priority:
+     *
+     * @see cn.svecri.feedive.data.ArticleRemoteMediator.RemoteFetchType
+     */
     fun intoRemoteFetchType(priority: Int?): ArticleRemoteMediator.RemoteFetchType {
         return when (this) {
             is All -> ArticleRemoteMediator.RemoteFetchType.All((priority ?: 5).coerceIn(1, 5))
@@ -141,6 +172,11 @@ sealed class ArticleFetchType {
     }
 
     companion object {
+        /**
+         * Build a ArticleFetchType from args in Navigation Route.
+         * @param type: Fetching Type, which can be group, feed, starred, laterRead or all
+         * @param detail: groupId or feedId when type is group or feed
+         */
         fun buildFromArgs(type: String?, detail: String?): ArticleFetchType {
             when (type) {
                 "group" -> {
@@ -161,6 +197,10 @@ sealed class ArticleFetchType {
     }
 }
 
+/**
+ * The primary view with Article List, title and some actions to update list or article state.
+ * @param type: Fetching Type indicates the feeds to query to fetch latest feeds.
+ */
 @Composable
 fun InfoFlowView(
     vm: InfoFlowViewModel = viewModel(),
@@ -322,7 +362,7 @@ fun InfoFlowView(
 
     Scaffold(
         topBar = {
-            TopAppBarWithTab(
+            InfoFlowTopAppBar(
                 title = title,
                 hasReadCondition = vm.hasReadCondition,
                 priority = vm.priority,
@@ -359,18 +399,22 @@ fun InfoFlowView(
             }
         ) {
             InfoFlowList(
-                articles,
-                offsetTop = with(LocalDensity.current) { swipeRefreshState.indicatorOffset.toDp() },
+                articles = articles,
+                modifier = Modifier.offset(y = (with(LocalDensity.current) { swipeRefreshState.indicatorOffset.toDp() })),
                 navController = navController,
             )
         }
     }
 }
 
+/**
+ * The Lazy List to present article flow.
+ * @param articles: the articles to display in list
+ */
 @Composable
 fun InfoFlowList(
+    modifier: Modifier = Modifier,
     articles: LazyPagingItems<ArticleInfoWithState>,
-    offsetTop: Dp = 0f.dp,
     navController: NavController,
 ) {
     val listState = rememberLazyListState()
@@ -386,7 +430,7 @@ fun InfoFlowList(
 
     LazyColumn(
         state = listState,
-        modifier = Modifier.offset(y = offsetTop)
+        modifier = modifier,
     ) {
         itemsIndexed(
             items = articles,
@@ -429,8 +473,18 @@ fun InfoFlowList(
     }
 }
 
+/**
+ * TopAppBar with a title and some actions.
+ * @param title: The title to be displayed in the center of the TopAppBar
+ * @param priority: The priority value displayed in Prior Action Icon.
+ * @param hasReadCondition: Current HasRead Filter. Effect the Icon Text of Has Read Filter.
+ * @param onPriorityChange: lambda to invoke when Priority Slider Finish Dragging. Should change priority value here.
+ * @param onRefresh: lambda to invoke when refresh icon clicked.
+ * @param onToggleHasRead: lambda to invoke when HasReadFilter Condition Toggled. Should change hasReadCondition here.
+ * @param onSetAllHasRead: lambda to invoke when set all articles HasRead clicked.
+ */
 @Composable
-fun TopAppBarWithTab(
+fun InfoFlowTopAppBar(
     title: String,
     priority: Int = 5,
     hasReadCondition: List<Boolean> = listOf(true, false),
@@ -495,6 +549,16 @@ fun TopAppBarWithTab(
     )
 }
 
+/**
+ * A PopupSlide used when change priority in TopAppBar.
+ * @param value: current value of the Slider. Range in 1..=5
+ * @param expand: if the Slide has display.
+ * @param onValueChange: lambda to invoke when slide dragged to some position. Slide Value should be updated here
+ * @param onValueChangeFinished: lambda to invoke when slide value finishing change. Slide Value Shouldn't be updated here
+ * @param onDismissRequest: lambda to invoke when interact outside the popup. Popup may closed here.
+ * @param offset: offset to anchor when displaying popup
+ * @param properties: [PopupProperties] for further customization of this popup's behavior.
+ */
 @Composable
 fun DropdownSlide(
     value: Int,
@@ -574,6 +638,15 @@ fun DropdownSlide(
     }
 }
 
+/**
+ * Display a Article Info on a Draggable Article Item.
+ * @param vm: We need [InfoFlowViewModel] to update article state
+ * @param info: the [ArticleInfo] to display
+ * @param onClick: lambda to invoke when clicking Article Item
+ * @param isRevealed: swipe state of ArticleItem
+ * @param onExpand: lambda to invoke when expanding ArticleItem
+ * @param onCollapse: lambda to invoke when collapsing Article Item
+ */
 @Composable
 fun InteractiveArticleItem(
     vm: InfoFlowViewModel = viewModel(),
@@ -606,6 +679,10 @@ fun InteractiveArticleItem(
     }
 }
 
+/**
+ * A Card can be Dragged/Swiped from right to left, and reveal 3 buttons to click.
+ * @param cardOffset: card offset to right border when revealed.
+ */
 @Composable
 fun DraggableCardWithButton(
     modifier: Modifier = Modifier,
@@ -714,6 +791,10 @@ fun DraggableCardWithButton(
     }
 }
 
+/**
+ * A Card can be dragged/swiped form right to left horizontally.
+ * @param cardOffset: card offset to right border when revealed.
+ */
 @Composable
 fun DraggableCard(
     isRevealed: Boolean,
@@ -768,6 +849,9 @@ fun DraggableCard(
     )
 }
 
+/**
+ * Article Item to display Article Title and sample image.
+ */
 @Composable
 fun ArticleDetailedItem(
     info: ArticleInfo,

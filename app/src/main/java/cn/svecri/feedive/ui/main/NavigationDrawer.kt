@@ -45,10 +45,13 @@ data class FeedGroupWithChildren(val feedGroup: FeedGroup, val feeds: List<Feed>
 
 class NavigationDrawerViewModel(application: Application) : AndroidViewModel(application) {
     private val appDatabase = AppDatabase.getInstance(application)
-    val feedGroupDao = appDatabase.feedGroupDao()
-    val feedInGroupDao = appDatabase.feedInGroupDao()
-    val feedDao = appDatabase.feedDao()
+    private val feedGroupDao = appDatabase.feedGroupDao()
+    private val feedInGroupDao = appDatabase.feedInGroupDao()
+    private val feedDao = appDatabase.feedDao()
 
+    /**
+     * Flow of saved feed groups as well as its children.
+     */
     fun feedGroups() = run {
         feedGroupDao.getAll()
             .map {
@@ -63,12 +66,18 @@ class NavigationDrawerViewModel(application: Application) : AndroidViewModel(app
             }.flatMapLatest { it }
     }
 
+    /**
+     * Flow of all feeds.
+     */
     fun allFeeds() = run {
         feedDao.getAllFeedsFlow()
     }
 }
 
 
+/**
+ * Drawer to Navigate to Different article info flow.
+ */
 @Composable
 fun NavigationDrawer(
     navController: NavController,
@@ -197,6 +206,9 @@ fun NavigationDrawer(
     }
 }
 
+/**
+ * Drawer Item which has a fold indicator. Used for FeedGroup.
+ */
 @Composable
 fun DrawerGroup(
     content: String,
@@ -219,6 +231,9 @@ fun DrawerGroup(
     )
 }
 
+/**
+ * Drawer Item used for Single Feed.
+ */
 @Composable
 fun DrawerItem(
     content: String,
@@ -236,6 +251,17 @@ fun DrawerItem(
     )
 }
 
+/**
+ * Column Item used in [NavigationDrawer].
+ * @param content: text displayed in the center of drawer item
+ * @param active: if active, the drawer item will background highlighted
+ * @param group: if group, there will be a triangle fold indicator on left of the content
+ * @param fold: if group, fold imply the rotation of triangle fold indicator
+ * @param offsetLeft: margin to the left
+ * @param fontSize: the size of content font
+ * @param onClick: lambda to invoke when click the item
+ * @param onFold: lambda to invoke when toggle fold state
+ */
 @Composable
 fun BaseDrawerItem(
     content: String,
