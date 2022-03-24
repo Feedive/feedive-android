@@ -59,7 +59,7 @@ fun MainScreenView() {
     Scaffold(
         scaffoldState = scaffoldState,
         backgroundColor = MaterialTheme.colors.background,
-        bottomBar = { BottomNavigationBar(navController) },
+        bottomBar = { BottomNavigationBar(navController, scaffoldState.drawerState) },
         drawerContent = {
             NavigationDrawer(navController, afterNav = {
                 scope.launch {
@@ -112,11 +112,23 @@ fun NavigationGraph(
 }
 
 @Composable
-fun BottomNavigationBar(navController: NavController) {
+fun BottomNavigationBar(navController: NavController, drawerState: DrawerState) {
+    val scope = rememberCoroutineScope()
     val items = listOf(BottomNavItem.InfoFlow)
     BottomNavigation {
         val navBackStackEntry by navController.currentBackStackEntryAsState()
         val currentDestination = navBackStackEntry?.destination
+        BottomNavigationItem(
+            icon = {
+                Icon(
+                    modifier = Modifier.height(24.dp),
+                    painter = painterResource(id = R.drawable.ic_menu),
+                    contentDescription = "Menu"
+                )
+            },
+            label = { Text(text = "Feeds") },
+            selected = false,
+            onClick = { scope.launch { drawerState.open() } })
         items.forEach { item ->
             BottomNavigationItem(
                 icon = {
