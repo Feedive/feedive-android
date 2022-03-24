@@ -124,11 +124,11 @@ class InfoFlowViewModel(application: Application) : AndroidViewModel(application
 }
 
 sealed class ArticleFetchType {
-    object All : ArticleFetchType();
-    data class Group(val groupId: Int) : ArticleFetchType();
-    data class Feed(val feedId: Int) : ArticleFetchType();
-    object Starred : ArticleFetchType();
-    object LaterRead : ArticleFetchType();
+    object All : ArticleFetchType()
+    data class Group(val groupId: Int) : ArticleFetchType()
+    data class Feed(val feedId: Int) : ArticleFetchType()
+    object Starred : ArticleFetchType()
+    object LaterRead : ArticleFetchType()
 
     fun intoRemoteFetchType(priority: Int?): ArticleRemoteMediator.RemoteFetchType {
         return when (this) {
