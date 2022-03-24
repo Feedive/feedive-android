@@ -18,14 +18,18 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.input.pointer.consumePositionChange
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -181,7 +185,8 @@ fun InfoFlowView(
                     .map { it.feedGroupName }
             }
             is ArticleFetchType.Feed -> {
-                vm.feedDao.getFlowById((flowType as ArticleFetchType.Feed).feedId).map { it.feedName }
+                vm.feedDao.getFlowById((flowType as ArticleFetchType.Feed).feedId)
+                    .map { it.feedName }
             }
         }
     }.collectAsState(initial = "Unknown")
@@ -259,7 +264,8 @@ fun InfoFlowView(
                 .map { articleInfo ->
                     ArticleInfoWithState(articleInfo)
                 }
-        }}.collectAsLazyPagingItems()
+        }
+    }.collectAsLazyPagingItems()
 
     val isRefreshing = articles.loadState.refresh == LoadState.Loading
     Log.d("InfoFlow", "Main View Recompose ${articles.loadState.refresh}")
@@ -408,22 +414,10 @@ fun InteractiveArticleItem(
     DraggableCardWithButton(
         modifier = Modifier.fillMaxWidth(),
         isRevealed = isRevealed,
-        cardOffset = 200.dp,
-        readText = if (!info.hasRead) {
-            "已读"
-        } else {
-            "未读"
-        },
-        starText = if (!info.starred) {
-            "收藏"
-        } else {
-            "取消收藏"
-        },
-        laterText = if (!info.laterRead) {
-            "稍后阅读"
-        } else {
-            "移除稍后阅读"
-        },
+        cardOffset = 150.dp,
+        hasRead = info.hasRead,
+        starred = info.starred,
+        laterRead = info.laterRead,
         onExpand = onExpand,
         onCollapse = onCollapse,
         onStar = {
@@ -444,10 +438,10 @@ fun InteractiveArticleItem(
 fun DraggableCardWithButton(
     modifier: Modifier = Modifier,
     isRevealed: Boolean,
-    cardOffset: Dp,
-    readText: String = "已读",
-    starText: String = "收藏",
-    laterText: String = "稍后阅读",
+    cardOffset: Dp = 150.dp,
+    hasRead: Boolean = false,
+    starred: Boolean = false,
+    laterRead: Boolean = false,
     onExpand: () -> Unit,
     onCollapse: () -> Unit,
     onHasRead: () -> Unit = {},
@@ -458,8 +452,10 @@ fun DraggableCardWithButton(
     val actionButtonModifier = { width: Dp ->
         Modifier
             .fillMaxHeight()
+            .padding(0.dp)
             .width(width = width)
     }
+    val buttonWidth = cardOffset / 3
     Box(
         modifier = modifier
     ) {
@@ -469,22 +465,70 @@ fun DraggableCardWithButton(
                 .matchParentSize()
         ) {
             Button(
-                modifier = actionButtonModifier(50.dp),
-                onClick = onHasRead
+                modifier = actionButtonModifier(buttonWidth),
+                shape = RectangleShape,
+                colors = ButtonDefaults.buttonColors(
+                    backgroundColor = if (hasRead) {
+                        MaterialTheme.colors.background
+                    } else {
+                        MaterialTheme.colors.primarySurface
+                    }
+                ),
+                onClick = onHasRead,
             ) {
-                Text(text = readText)
+                Icon(
+                    painter = painterResource(id = R.drawable.ic_has_read),
+                    tint = if (hasRead) {
+                        MaterialTheme.colors.onBackground
+                    } else {
+                        MaterialTheme.colors.onPrimary
+                    },
+                    contentDescription = "Not Read"
+                )
             }
             Button(
-                modifier = actionButtonModifier(50.dp),
+                modifier = actionButtonModifier(buttonWidth),
+                shape = RectangleShape,
+                colors = ButtonDefaults.buttonColors(
+                    backgroundColor = if (!starred) {
+                        MaterialTheme.colors.background
+                    } else {
+                        MaterialTheme.colors.primarySurface
+                    }
+                ),
                 onClick = onStar
             ) {
-                Text(text = starText)
+                Icon(
+                    painter = painterResource(id = R.drawable.ic_star),
+                    tint = if (!starred) {
+                        MaterialTheme.colors.onBackground
+                    } else {
+                        MaterialTheme.colors.onPrimary
+                    },
+                    contentDescription = "Not Starred"
+                )
             }
             Button(
-                modifier = actionButtonModifier(100.dp),
+                modifier = actionButtonModifier(buttonWidth),
+                shape = RectangleShape,
+                colors = ButtonDefaults.buttonColors(
+                    backgroundColor = if (!laterRead) {
+                        MaterialTheme.colors.background
+                    } else {
+                        MaterialTheme.colors.primarySurface
+                    }
+                ),
                 onClick = onLaterRead
             ) {
-                Text(text = laterText)
+                Icon(
+                    painter = painterResource(id = R.drawable.ic_later),
+                    tint = if (!laterRead) {
+                        MaterialTheme.colors.onBackground
+                    } else {
+                        MaterialTheme.colors.onPrimary
+                    },
+                    contentDescription = "Starred"
+                )
             }
         }
         DraggableCard(
@@ -579,14 +623,21 @@ fun ArticleDetailedItem(
                     maxLines = 3,
                 )
                 Text(
-                    text = "${info.sourceName}${
-                        if (info.time != null) " / ${
-                            Duration.between(
-                                info.time,
-                                LocalDateTime.now()
-                            ).toHours()
-                        } hr ago" else ""
-                    }${if (info.hasRead) " - has read" else ""}",
+                    text = buildAnnotatedString {
+                        append(
+                            "${info.sourceName}${
+                                if (info.time != null) " / ${
+                                    Duration.between(
+                                        info.time,
+                                        LocalDateTime.now()
+                                    ).toHours()
+                                } hr ago" else ""
+                            }"
+                        )
+                        withStyle(style = SpanStyle(color = MaterialTheme.colors.error)) {
+                            append(if (!info.hasRead) " - not read" else "")
+                        }
+                    },
                     fontSize = 10.sp,
                     maxLines = 1,
                 )
