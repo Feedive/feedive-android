@@ -43,11 +43,26 @@ sealed class BottomNavItem(
     val title: String,
     val icon: Int,
     val screenRoute: String,
-    val optParameters: String = ""
+    val optParameters: String = "",
+    val defaultRoute: String = ""
 ) {
 
     object InfoFlow :
-        BottomNavItem("Flow", R.drawable.ic_feeds, "info_flow", "/{type}?detail={detail}")
+        BottomNavItem(
+            "Flow",
+            R.drawable.ic_feeds,
+            "info_flow",
+            "/{type}?detail={detail}",
+            defaultRoute = "info_flow/all"
+        )
+
+    object SourceManage : BottomNavItem(
+        "Source",
+        R.drawable.ic_source_manage,
+        "/source_manage",
+        defaultRoute = "/source_manage"
+    )
+
 }
 
 @Composable
@@ -108,13 +123,16 @@ fun NavigationGraph(
             backStackEntry.arguments?.getString("link")
                 ?.let { ArticleView(it, navController = navController) }
         }
+        composable(BottomNavItem.SourceManage.screenRoute) {
+            ResourceManagerView(navController = navController)
+        }
     }
 }
 
 @Composable
 fun BottomNavigationBar(navController: NavController, drawerState: DrawerState) {
     val scope = rememberCoroutineScope()
-    val items = listOf(BottomNavItem.InfoFlow)
+    val items = listOf(BottomNavItem.InfoFlow, BottomNavItem.SourceManage)
     BottomNavigation {
         val navBackStackEntry by navController.currentBackStackEntryAsState()
         val currentDestination = navBackStackEntry?.destination
@@ -143,7 +161,7 @@ fun BottomNavigationBar(navController: NavController, drawerState: DrawerState) 
                     it.route?.split("/")?.get(0) == item.screenRoute
                 } == true,
                 onClick = {
-                    navController.navigate(item.screenRoute + "/all") {
+                    navController.navigate(item.defaultRoute) {
                         navController.graph.startDestinationRoute?.let { screenRoute ->
                             popUpTo(screenRoute) {
                                 saveState = true
