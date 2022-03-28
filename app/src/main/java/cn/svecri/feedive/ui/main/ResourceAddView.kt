@@ -19,7 +19,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
@@ -30,6 +29,7 @@ import androidx.compose.runtime.Composable
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation.NavController
 import cn.svecri.feedive.data.AppDatabase
 import cn.svecri.feedive.data.Feed
 import cn.svecri.feedive.ui.theme.FeediveTheme
@@ -174,14 +174,15 @@ fun GroupSelectDialog(showDialog: Boolean, setShowDialog: (Boolean) -> Unit) {
 
 }
 
-
-@Preview(showBackground = true)
 @Composable
-fun ResourceAddViewPreviewer() = ResourceAddView()
-
+fun ResourceManagerView(navController: NavController) {
+    Scaffold() {
+        ResourceAddDialog()
+    }
+}
 
 @Composable
-fun ResourceAddView(vm: ResourceManagerViewModel = viewModel()) {
+fun ResourceAddDialog(vm: ResourceManagerViewModel = viewModel()) {
     val isShowing = remember {
         mutableStateOf(true)
     }
