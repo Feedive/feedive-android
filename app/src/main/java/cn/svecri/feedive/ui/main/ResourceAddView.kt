@@ -14,6 +14,7 @@ import androidx.compose.material.*
 import androidx.compose.material.ButtonDefaults.buttonColors
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.outlined.Add
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -62,10 +63,16 @@ class ResourceManagerViewModel(application: Application) : AndroidViewModel(appl
     private val appDatabase = AppDatabase.getInstance(application)
     private val feedDao = appDatabase.feedDao()
 
+    var isAddViewShow by mutableStateOf(false)
+
     fun insertFeed(feed: Feed) {
         viewModelScope.launch(Dispatchers.IO) {
             feedDao.insertFeed(feed = feed)
         }
+    }
+
+    fun setIsAddViewShow(isShow: Boolean) {
+        isAddViewShow = isShow
     }
 }
 
@@ -175,19 +182,27 @@ fun GroupSelectDialog(showDialog: Boolean, setShowDialog: (Boolean) -> Unit) {
 }
 
 @Composable
-fun ResourceManagerView(navController: NavController) {
-    Scaffold() {
-        ResourceAddDialog()
+fun ResourceManagerView(navController: NavController, vm: ResourceManagerViewModel = viewModel()) {
+    FeediveTheme {
+        Scaffold(
+            topBar = {
+                TopAppBar(title = { Text(text = "ResourceManage") },
+                    navigationIcon = {
+                        IconButton(
+                            onClick = { vm.setIsAddViewShow(true) }) {
+                            Icon(Icons.Outlined.Add, contentDescription = "AddResource")
+                        }
+                    })
+            })
+        {
+            ResourceAddDialog(vm)
+        }
     }
 }
 
 @Composable
 fun ResourceAddDialog(vm: ResourceManagerViewModel = viewModel()) {
-    val isShowing = remember {
-        mutableStateOf(true)
-    }
-
-    FeediveTheme {
+    if (vm.isAddViewShow) {
         Box {
             val (showSelectDialog, setShowSelectDialog) = remember { mutableStateOf(false) }
             Column(
@@ -246,7 +261,7 @@ fun ResourceAddDialog(vm: ResourceManagerViewModel = viewModel()) {
                     horizontalArrangement = Arrangement.SpaceAround
                 ) {
                     Button(
-                        onClick = { isShowing.value = false },
+                        onClick = { vm.setIsAddViewShow(false) },
                         colors = buttonColors(Color.White),
                         elevation = ButtonDefaults.elevation(defaultElevation = 0.dp),
                         border = BorderStroke(0.dp, Color.White)
@@ -256,7 +271,7 @@ fun ResourceAddDialog(vm: ResourceManagerViewModel = viewModel()) {
                     }
                     Button(
                         onClick = {
-                            isShowing.value = false
+                            vm.setIsAddViewShow(false)
                             vm.insertFeed(
                                 Feed(
                                     0,
@@ -277,4 +292,5 @@ fun ResourceAddDialog(vm: ResourceManagerViewModel = viewModel()) {
             }
         }
     }
+
 }
