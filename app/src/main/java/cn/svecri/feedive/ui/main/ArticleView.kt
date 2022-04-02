@@ -126,10 +126,7 @@ fun ArticleView(
                             javaScriptCanOpenWindowsAutomatically = true
                             //加载缓存内容
                             cacheMode = WebSettings.LOAD_DEFAULT
-                            allowFileAccess = true
-                            allowContentAccess = true
                             domStorageEnabled = true
-                            databaseEnabled = true
                             textZoom = 100
                         }
                     },
