@@ -104,6 +104,10 @@ interface ArticleDao {
         sourcePriority: Int,
     )
 
+    @Query("select * from article where id = :articleId")
+    suspend fun queryArticleById(articleId:Int):List<Article>
+
+
     @Query("delete from article")
     suspend fun clearAll()
 
