@@ -3,49 +3,27 @@ package cn.svecri.feedive.ui.main
 import android.annotation.SuppressLint
 import android.app.Application
 import android.content.Context
-import android.content.SharedPreferences
-import android.graphics.PixelFormat
 import android.os.Parcelable
 import android.util.Log
-import android.view.View
-import android.view.WindowManager
 import android.webkit.WebSettings
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.*
 import androidx.compose.runtime.*
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.snapshots.Snapshot.Companion.observe
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.AbstractComposeView
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalView
-import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.lifecycle.*
 import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.navigation.NavController
-import androidx.navigation.compose.rememberNavController
-import androidx.savedstate.ViewTreeSavedStateRegistryOwner
-import cn.svecri.feedive.R
 import cn.svecri.feedive.data.AppDatabase
 import cn.svecri.feedive.data.Article
-import cn.svecri.feedive.data.Article.Companion.fromRss
-import cn.svecri.feedive.data.Feed
 import cn.svecri.feedive.model.RssArticle
 import cn.svecri.feedive.model.ArticleCategory
 import cn.svecri.feedive.model.ArticleGuid
 import cn.svecri.feedive.model.ArticleSource
 import cn.svecri.feedive.ui.theme.FeediveTheme
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.parcelize.Parcelize
-import java.io.Reader
-import java.util.*
 
 @Parcelize
 data class ReaderSettings(
@@ -90,8 +68,6 @@ class ArticleViewModel(application: Application) : AndroidViewModel(application)
             setLoading(false)
         }
     }
-    //todo: webView Settings
-//    private
 }
 
 @SuppressLint("SetJavaScriptEnabled", "CommitPrefEdits")
@@ -203,7 +179,6 @@ fun ProgressCircularLoopDemo() {
     }
 }
 
-//TODO：生成网页的样式修改
 fun generateHtmlStr(rssArticle: RssArticle,userSettings: ReaderSettings): String {
     val textSize = userSettings.textSize.toString()
     val lineIndent = userSettings.lineIndent.toString()
@@ -233,224 +208,17 @@ fun generateHtmlStr(rssArticle: RssArticle,userSettings: ReaderSettings): String
         }
     }
 
-   val styleStr = "<style>\n" +
-           "      *[hidefocus],\n" +
-           "      input,\n" +
-           "      textarea,\n" +
-           "      a {\n" +
-           "        outline: none;\n" +
-           "      }\n" +
-           "      body,\n" +
-           "      div,\n" +
-           "      dl,\n" +
-           "      dt,\n" +
-           "      dd,\n" +
-           "      ul,\n" +
-           "      ol,\n" +
-           "      li,\n" +
-           "      h1,\n" +
-           "      h2,\n" +
-           "      h3,\n" +
-           "      h4,\n" +
-           "      h5,\n" +
-           "      h6,\n" +
-           "      pre,\n" +
-           "      form,\n" +
-           "      fieldset,\n" +
-           "      input,\n" +
-           "      textarea,\n" +
-           "      p,\n" +
-           "      blockquote,\n" +
-           "      th,\n" +
-           "      td {\n" +
-           "        padding: 0;\n" +
-           "        margin: 0;\n" +
-           "      }\n" +
-           "      fieldset,\n" +
-           "      img,\n" +
-           "      html,\n" +
-           "      body,\n" +
-           "      iframe {\n" +
-           "        border: 0;\n" +
-           "      }\n" +
-           "      table {\n" +
-           "        border-collapse: collapse;\n" +
-           "        border-spacing: 0;\n" +
-           "      }\n" +
-           "      li {\n" +
-           "        list-style: none;\n" +
-           "      }\n" +
-           "      h1,\n" +
-           "      h2,\n" +
-           "      h3,\n" +
-           "      h4,\n" +
-           "      h5,\n" +
-           "      h6 {\n" +
-           "        font-size: 100%;\n" +
-           "      }\n" +
-           "      caption,\n" +
-           "      th {\n" +
-           "        font-weight: normal;\n" +
-           "        font-style: normal;\n" +
-           "        text-align: left;\n" +
-           "      }\n" +
-           "      em,\n" +
-           "      strong {\n" +
-           "        font-weight: bold;\n" +
-           "        font-style: normal;\n" +
-           "      }\n" +
-           "      body,\n" +
-           "      textarea,\n" +
-           "      select,\n" +
-           "      input,\n" +
-           "      pre {\n" +
-           "        font-family: arial, microsoft yahei, helvetica, sans-serif;\n" +
-           "        font-size: 14px;\n" +
-           "        color: #555;\n" +
-           "      }\n" +
-           "      body {\n" +
-           "        line-height: 1.5em;\n" +
-           "        -webkit-text-size-adjust: none;\n" +
-           "      }\n" +
-           "      a,\n" +
-           "      button {\n" +
-           "        cursor: pointer;\n" +
-           "      }\n" +
-           "      textarea {\n" +
-           "        resize: none;\n" +
-           "        overflow: auto;\n" +
-           "      }\n" +
-           "      pre {\n" +
-           "        white-space: pre-wrap;\n" +
-           "      }\n" +
-           "      a {\n" +
-           "        color: #333;\n" +
-           "        text-decoration: none;\n" +
-           "      }\n" +
-           "      input {\n" +
-           "        -webkit-tap-highlight-color: rgba(255, 255, 255, 0);\n" +
-           "        -webkit-user-modify: read-white-plaintext-only;\n" +
-           "      }\n" +
-           "      button {\n" +
-           "        -webkit-tap-highlight-color: rgba(255, 255, 255, 0);\n" +
-           "      }\n" +
-           "      html {\n" +
-           "        width: 100%;\n" +
-           "        height: 100%;\n" +
-           "        overflow-x: hidden;\n" +
-           "      }\n" +
-           "      body {\n" +
-           "        text-align: left;\n" +
-           "        width: 100%;\n" +
-           "        overflow: hidden;\n" +
-           "        background: "+ bgColor +";\n" +
-           "      }\n" +
-           "      p {\n" +
-           "        text-indent: 2em;\n" +
-           "        margin: 0.5em 0;\n" +
-           "        letter-spacing: 0px;\n" +
-           "        line-height: "+(textSize.toInt()+lineIndent.toInt()).toString() +"px;\n" +
-           "        font-size: "+ textSize +"px;\n" +
-           "        background-color: "+ bgColor +";"+
-           "        color: " + textColor +";" +
-           "      }\n" +
-           "      img {\n" +
-           "        max-width: 100%;\n" +
-           "        height: auto;\n" +
-           "      }\n" +
-           "      #main {\n" +
-           "        font-size: "+ textSize +"px;\n" +
-           "        color: "+ textColor +";\n" +
-           "        line-height: "+(textSize.toInt()+lineIndent.toInt()).toString() +"px;\n" +
-           "        padding: 15px;\n" +
-           "      }\n" +
-           "      .nav-pannel-bk {\n" +
-           "        position: fixed;\n" +
-           "        bottom: 0px;\n" +
-           "        height: 150px;\n" +
-           "        width: 100%;\n" +
-           "        background: #000;\n" +
-           "        opacity: 0.9;\n" +
-           "        z-index: 10000;\n" +
-           "      }\n" +
-           "\n" +
-           "      .nav-pannel {\n" +
-           "        position: fixed;\n" +
-           "        bottom: 0px;\n" +
-           "        height: 150px;\n" +
-           "        widows: 100%;\n" +
-           "        background: none;\n" +
-           "        color: #fff;\n" +
-           "        flex-direction: column;\n" +
-           "        z-index: 10001;\n" +
-           "      }\n" +
-           "\n" +
-           "      .child-mod {\n" +
-           "        padding: 5px 10px;\n" +
-           "        margin: 1px 15px;\n" +
-           "      }\n" +
-           "\n" +
-           "      .bk-container {\n" +
-           "        position: relative;\n" +
-           "        width: 30px;\n" +
-           "        height: 30px;\n" +
-           "        border-radius: 15px;\n" +
-           "        background: #ffffff;\n" +
-           "        display: inline-block;\n" +
-           "        vertical-align: -14px;\n" +
-           "        margin-left: 10px;\n" +
-           "      }\n" +
-           "\n" +
-           "      .bk-container-current {\n" +
-           "        position: absolute;\n" +
-           "        width: 32px;\n" +
-           "        height: 32px;\n" +
-           "        border-radius: 16px;\n" +
-           "        border: 1px #ff7800 solid;\n" +
-           "        display: inline-block;\n" +
-           "        top: -2px;\n" +
-           "        left: -2px;\n" +
-           "      }\n" +
-           "\n" +
-           "      .child-mod span {\n" +
-           "        display: inline-block;\n" +
-           "        padding-right: 20px;\n" +
-           "        padding-left: 10px;\n" +
-           "      }\n" +
-           "\n" +
-           "      .child-mod button {\n" +
-           "        border-radius: 16px;\n" +
-           "        background: none;\n" +
-           "        border: 1px #c8c8c8 solid;\n" +
-           "        padding: 5px 40px;\n" +
-           "        color: #fff;\n" +
-           "      }\n" +
-           "\n" +
-           "      .child-mod button:nth-child(2) {\n" +
-           "        margin-right: 10px;\n" +
-           "      }\n" +
-           "      .child-mod div:nth-child(3) {\n" +
-           "        background: #e9dfc7;\n" +
-           "      }\n" +
-           "\n" +
-           "      .child-mod div:nth-child(4) {\n" +
-           "        background: #add678;\n" +
-           "      }\n" +
-           "\n" +
-           "      .child-mod div:nth-child(5) {\n" +
-           "        background: #696969;\n" +
-           "      }\n" +
-           "      .child-mod div:nth-child(6) {\n" +
-           "        background: #336699;\n" +
-           "      }\n" +
-           "\n" +
-           "      .icon-text {\n" +
-           "        position: absolute;\n" +
-           "        top: 25px;\n" +
-           "        font-size: 10px;\n" +
-           "      }\n" +
-           "    </style>"
-        val settingJS = "<script>\n" +
+    val styleStr = "<style>\n" +
+            "*[hidefocus],input,textarea,a{outline:0}body,div,dl,dt,dd,ul,ol,li,h1,h2,h3,h4,h5,h6,pre,form,fieldset,input,textarea,p,blockquote,th,td{padding:0;margin:0}fieldset,img,html,body,iframe{border:0}table{border-collapse:collapse;border-spacing:0}\n" +
+            "li{list-style:none}h1,h2,h3,h4,h5,h6{font-size:100%}caption,th{font-weight:normal;font-style:normal;text-align:left}em,strong{font-weight:bold;font-style:normal}body,textarea,select,input,pre{font-family:arial,microsoft yahei,helvetica,sans-serif;font-size:14px;color:#555}\n" +
+            "body{line-height:1.5em;-webkit-text-size-adjust:none}a,button{cursor:pointer}textarea{resize:none;overflow:auto}pre{white-space:pre-wrap}a{color:#333;text-decoration:none}input{-webkit-tap-highlight-color:rgba(255,255,255,0);-webkit-user-modify:read-white-plaintext-only}\n" +
+            "button{-webkit-tap-highlight-color:rgba(255,255,255,0)}html{width:100%;height:100%;overflow-x:hidden}body{text-align:left;width:100%;overflow:hidden;background:#e9dfc7}p{text-indent:2em;margin:.5em 0;letter-spacing:0;line-height:24px;font-size:14px}\n" +
+            "img{max-width:100%;height:auto}#main{font-size:14px;color:#555;line-height:31px;padding:15px}.nav-pannel-bk{position:fixed;bottom:0;height:150px;width:100%;background:#000;opacity:.9;z-index:10000}.nav-pannel{position:fixed;bottom:0;height:150px;widows:100%;background:0;color:#fff;flex-direction:column;z-index:10001}\n" +
+            ".child-mod{padding:5px 10px;margin:1px 15px}.bk-container{position:relative;width:30px;height:30px;border-radius:15px;background:#fff;display:inline-block;vertical-align:-14px;margin-left:10px}.bk-container-current{position:absolute;width:32px;height:32px;border-radius:16px;border:1px #ff7800 solid;display:inline-block;top:-2px;left:-2px}\n" +
+            ".child-mod span{display:inline-block;padding-right:20px;padding-left:10px}.child-mod button{border-radius:16px;background:0;border:1px #c8c8c8 solid;padding:5px 40px;color:#fff}.child-mod button:nth-child(2){margin-right:10px}\n" +
+            ".child-mod div:nth-child(3){background:#e9dfc7}.child-mod div:nth-child(4){background:#add678}.child-mod div:nth-child(5){background:#666}.child-mod div:nth-child(6){background:#369}.icon-text{position:absolute;top:25px;font-size:10px}" +
+            "</style>"
+    val settingJS = "<script>\n" +
             "  var main = document.getElementById(\"main\");\n" +
             "  var p = document.getElementsByTagName(\"p\");\n" +
             "  var body = document.getElementById(\"body\");\n" +
@@ -473,37 +241,23 @@ fun generateHtmlStr(rssArticle: RssArticle,userSettings: ReaderSettings): String
             "  function updateText() {\n" +
             "    main.style.fontSize = text_size + \"px\";\n" +
             "    main.style.lineHeight = text_size + line_indent + \"px\";\n" +
-            "    for (var item = 0; item < p.length; item++) {\n" +
-            "      p[item].style.fontSize = text_size + \"px\";\n" +
-            "      p[item].style.lineHeight = text_size + line_indent + \"px\";\n" +
-            "    }\n" +
-            "    store();\n" +
-            "  }\n" +
+            "    for (var item = 0; item < p.length; item++) {\np[item].style.fontSize = text_size + \"px\";\n" +
+            "      p[item].style.lineHeight = text_size + line_indent + \"px\";\n}\n" +
+            "    store();\n}\n" +
             "  function text_size_inc() {\n" +
-            "    if (text_size < 30) text_size++;\n" +
-            "    updateText();\n" +
-            "  }\n" +
+            "    if (text_size < 30) text_size++;updateText();\n}\n" +
             "  function text_size_dec() {\n" +
-            "    if (text_size > 8) text_size--;\n" +
-            "    updateText();\n" +
-            "  }\n" +
+            "    if (text_size > 8) text_size--;updateText();\n}\n" +
             "  function line_indent_inc() {\n" +
-            "    if (line_indent < 30) line_indent++;\n" +
-            "    updateText();\n" +
-            "  }\n" +
+            "    if (line_indent < 30) line_indent++;updateText();\n}\n" +
             "  function line_indent_dec() {\n" +
-            "    if (line_indent > 2) line_indent--;\n" +
-            "    updateText();\n" +
-            "  }\n" +
+            "    if (line_indent > 2) line_indent--;updateText()\n }\n" +
             "  function show() {\n" +
             "    config_panel.style.display = \"flex\";\n" +
-            "    config_panel_bk.style.display = \"flex\";\n" +
-                "store();\n"+
-            "  }\n" +
+            "    config_panel_bk.style.display = \"flex\";\n}\n" +
             "  function dismiss() {\n" +
             "    config_panel.style.display = \"none\";\n" +
-            "    config_panel_bk.style.display = \"none\";\n" +
-            "  }\n" +
+            "    config_panel_bk.style.display = \"none\";\n}\n" +
             "  var bk_container_white = document.getElementById(\"bk_container_white\");\n" +
             "  var bk_container_yellow = document.getElementById(\"bk_container_yellow\");\n" +
             "  var bk_container_green = document.getElementById(\"bk_container_green\");\n" +
@@ -516,79 +270,48 @@ fun generateHtmlStr(rssArticle: RssArticle,userSettings: ReaderSettings): String
             "  bk_container_blue.onclick = bgcolor_blue;\n" +
             "  function bgcolor_white() {\n" +
             "    theme = \"white\";\n" +
-            "    background_color(\"#FFFFFF\");\n" +
-            "    text_color(\"#000000\");\n" +
-            "    store();\n" +
-            "  }\n" +
+            "    background_color(\"#FFFFFF\");text_color(\"#000000\");store();\n}\n" +
             "  function bgcolor_yellow() {\n" +
             "    theme = \"yellow\";\n" +
-            "    background_color(\"#e9dfc7\");\n" +
-            "    text_color(\"#000000\");\n" +
-                "    store();\n" +
-            "  }\n" +
+            "    background_color(\"#e9dfc7\");text_color(\"#000000\");store();\n}\n" +
             "  function bgcolor_green() {\n" +
             "    theme = \"green\";\n" +
-            "    background_color(\"#ADD678\");\n" +
-            "    text_color(\"#000000\");\n" +
-                "    store();\n" +
-            "  }\n" +
+            "    background_color(\"#ADD678\");text_color(\"#000000\");store();\n}\n" +
             "  function bgcolor_black() {\n" +
             "    theme = \"black\";\n" +
-            "    background_color(\"#696969\");\n" +
-            "    text_color(\"#FFFFFF\");\n" +
-                "    store();\n" +
-            "  }\n" +
+            "    background_color(\"#696969\");text_color(\"#FFFFFF\");store();\n}\n" +
             "  function bgcolor_blue() {\n" +
             "    theme = \"blue\";\n" +
-            "    background_color(\"#336699\");\n" +
-            "    text_color(\"#FFFFFF\");\n" +
-                "    store();\n" +
-            "  }\n" +
+            "    background_color(\"#336699\");text_color(\"#FFFFFF\");store();\n}\n" +
             "  function background_color(color) {\n" +
             "    body.style.background = color;\n" +
             "    for (var item = 0; item < p.length; item++) {\n" +
-            "      p[item].style.backgroundColor = color;\n" +
-            "    }\n" +
-            "  }\n" +
+            "      p[item].style.backgroundColor = color;\n}\n}\n" +
             "  function text_color(color) {\n" +
             "    main.style.color = color;\n" +
-            "    for (var item = 0; item < p.length; item++) {\n" +
-            "      p[item].style.cssText += \"color:\" + color + \";\";\n" +
-            "    }\n" +
-            "  }\n" +
-            "\n" +
+            "    for (var item = 0; item < p.length; item++) {\np[item].style.cssText += \"color:\" + color + \";\";" +
+            "   \n}\n }\n" +
             "  function store() {\n" +
-                "android.spstore(text_size,line_indent,theme);\n" +
-            "  }\n" +
-            "\n" +
+            "android.spstore(text_size,line_indent,theme);\n}\n" +
             "  function initial() {\n" +
             "    switch (theme) {\n" +
             "      case \"white\":\n" +
-            "        bgcolor_white();\n" +
-            "        break;\n" +
+            "        bgcolor_white();break;\n" +
             "      case \"yellow\":\n" +
-            "        bgcolor_yellow();\n" +
-            "        break;\n" +
+            "        bgcolor_yellow();break;\n" +
             "      case \"green\":\n" +
-            "        bgcolor_green();\n" +
-            "        break;\n" +
+            "        bgcolor_green();break;\n" +
             "      case \"black\":\n" +
-            "        bgcolor_black();\n" +
-            "        break;\n" +
+            "        bgcolor_black();break;\n" +
             "      case \"blue\":\n" +
-            "        bgcolor_blue();\n" +
-            "        break;\n" +
+            "        bgcolor_blue();break;\n" +
             "      default:\n" +
-            "        bgcolor_yellow();\n" +
-            "    }\n" +
-            "    updateText();\n" +
-            "  }\n" +
-            "\n" +
+            "        bgcolor_yellow();\n}\n" +
+            "    updateText();\n}\n" +
             "  window.onload = function () {\n" +
-            "    initial();\n" +
-            "  };\n" +
+            "    initial();\n};\n" +
             "</script>\n"
-        val htmlStr = "<html> \n" +
+    val htmlStr = "<html> \n" +
             "<head> \n" +
             "<title>${rssArticle.title}</title>" +
             styleStr +
@@ -597,37 +320,7 @@ fun generateHtmlStr(rssArticle: RssArticle,userSettings: ReaderSettings): String
             "</head> \n" +
             "<body id=\"body\">" +
             "<div id=\"main\">${rssArticle.description}</div>" +
-            "<div id=\"nav-pannel-bk\" class=\"nav-pannel-bk\" style=\"display: none\"></div>\n" +
-            "    <div id=\"font-container\" class=\"nav-pannel\" style=\"display: none\">\n" +
-            "      <div class=\"child-mod\">\n" +
-            "        <span>字号</span>\n" +
-            "        <button id=\"large-font\" class=\"size-button\">大</button>\n" +
-            "        <button id=\"small-font\" class=\"size-button\">小</button>\n" +
-            "      </div>\n" +
-            "      <div class=\"child-mod\">\n" +
-            "        <span>行距</span>\n" +
-            "        <button id=\"large-indent\" class=\"size-button\">大</button>\n" +
-            "        <button id=\"small-indent\" class=\"size-button\">小</button>\n" +
-            "      </div>\n" +
-            "      <div class=\"child-mod\">\n" +
-            "        <span>背景</span>\n" +
-            "        <div class=\"bk-container\" id=\"bk_container_white\">\n" +
-            "          <div class=\"bk-container-current\"></div>\n" +
-            "        </div>\n" +
-            "        <div class=\"bk-container\" id=\"bk_container_yellow\">\n" +
-            "          <div class=\"bk-container-current\"></div>\n" +
-            "        </div>\n" +
-            "        <div class=\"bk-container\" id=\"bk_container_green\">\n" +
-            "          <div class=\"bk-container-current\"></div>\n" +
-            "        </div>\n" +
-            "        <div class=\"bk-container\" id=\"bk_container_black\">\n" +
-            "          <div class=\"bk-container-current\"></div>\n" +
-            "        </div>\n" +
-            "        <div class=\"bk-container\" id=\"bk_container_blue\">\n" +
-            "          <div class=\"bk-container-current\"></div>\n" +
-            "        </div>\n" +
-            "      </div>\n" +
-            "    </div>" +
+            "<div id=\"nav-pannel-bk\" class=\"nav-pannel-bk\" style=\"display: none\"></div><div id=\"font-container\" class=\"nav-pannel\" style=\"display: none\"><div class=\"child-mod\"><span>字号</span><button id=\"large-font\" class=\"size-button\">大</button><button id=\"small-font\" class=\"size-button\">小</button></div><div class=\"child-mod\"><span>行距</span><button id=\"large-indent\" class=\"size-button\">大</button><button id=\"small-indent\" class=\"size-button\">小</button></div><div class=\"child-mod\"><span>背景</span><div class=\"bk-container\" id=\"bk_container_white\"><div class=\"bk-container-current\"></div></div><div class=\"bk-container\" id=\"bk_container_yellow\"><div class=\"bk-container-current\"></div></div><div class=\"bk-container\" id=\"bk_container_green\"><div class=\"bk-container-current\"></div></div><div class=\"bk-container\" id=\"bk_container_black\"><div class=\"bk-container-current\"></div></div><div class=\"bk-container\" id=\"bk_container_blue\"><div class=\"bk-container-current\"></div></div></div>" +
             "</body>" +
             "</html>" + settingJS
 
