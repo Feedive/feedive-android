@@ -70,6 +70,8 @@ fun MainScreenView() {
     val navController = rememberNavController()
     val scaffoldState = rememberScaffoldState()
     val scope = rememberCoroutineScope()
+
+
     // A surface container using the 'background' color from the theme
     Scaffold(
         scaffoldState = scaffoldState,
@@ -118,10 +120,6 @@ fun NavigationGraph(
                 ),
                 snackbarHostState = snackbarHostState,
             )
-        }
-        composable("article?link={link}") { backStackEntry ->
-            backStackEntry.arguments?.getString("link")
-                ?.let { ArticleView(it, navController = navController) }
         }
         composable(BottomNavItem.SourceManage.screenRoute) {
             ResourceManagerView(navController = navController)

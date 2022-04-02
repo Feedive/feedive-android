@@ -15,6 +15,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.RectangleShape
@@ -31,9 +32,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.*
-import androidx.compose.ui.window.Popup
-import androidx.compose.ui.window.PopupPositionProvider
-import androidx.compose.ui.window.PopupProperties
+import androidx.compose.ui.window.*
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -411,6 +410,7 @@ fun InfoFlowView(
  * The Lazy List to present article flow.
  * @param articles: the articles to display in list
  */
+@OptIn(ExperimentalComposeUiApi::class)
 @Composable
 fun InfoFlowList(
     modifier: Modifier = Modifier,
@@ -427,47 +427,59 @@ fun InfoFlowList(
         }
         anyRevealed
     }
-
-    LazyColumn(
-        state = listState,
-        modifier = modifier,
-    ) {
-        itemsIndexed(
-            items = articles,
-            key = { _, item ->
-                item.info.articleId
-            }
-        ) { _, item ->
-            item?.let { articleInfoWithState ->
-                val isRevealed by
-                remember(key1 = articleInfoWithState.info.articleId) {
-                    derivedStateOf {
-                        articleInfoWithState.info.articleId == revealedId
-                    }
+    var showFullScreenArticle by remember { mutableStateOf(false) }
+    var fullScreenArticleId by remember { mutableStateOf(0)}
+    if (showFullScreenArticle){
+        Dialog(
+            onDismissRequest = { showFullScreenArticle = false },
+            properties = DialogProperties(dismissOnBackPress = true, dismissOnClickOutside = false, usePlatformDefaultWidth = false)
+        ){
+            ArticleView(articleId = fullScreenArticleId)
+        }
+    }
+    else{
+        LazyColumn(
+            state = listState,
+            modifier = modifier,
+        ) {
+            itemsIndexed(
+                items = articles,
+                key = { _, item ->
+                    item.info.articleId
                 }
-                InteractiveArticleItem(
-                    info = articleInfoWithState.info,
-                    isRevealed = articleInfoWithState.info.articleId == revealedId,
-                    onClick = {
-                        if (!resetAllArticlesRevealState()) {
-                            Log.d("InfoFlow", "${articleInfoWithState.info.title} clicked")
-                            Log.d("InfoFlow", "navigate to ${articleInfoWithState.info.link}")
-                            navController.navigate("article?link=${articleInfoWithState.info.link}")
+            ) { _, item ->
+                item?.let { articleInfoWithState ->
+                    val isRevealed by
+                    remember(key1 = articleInfoWithState.info.articleId) {
+                        derivedStateOf {
+                            articleInfoWithState.info.articleId == revealedId
                         }
-                    },
-                    onExpand = {
-                        if (!isRevealed && !resetAllArticlesRevealState()) {
-                            Log.d("InfoFlow", "${articleInfoWithState.info.title} revealed")
-                            revealedId = item.info.articleId
-                        }
-                    },
-                    onCollapse = {
-                        if (isRevealed) {
-                            Log.d("InfoFlow", "${articleInfoWithState.info.title} collapse")
-                            revealedId = -1
-                        }
-                    },
-                )
+                    }
+                    InteractiveArticleItem(
+                        info = articleInfoWithState.info,
+                        isRevealed = articleInfoWithState.info.articleId == revealedId,
+                        onClick = {
+                            if (!resetAllArticlesRevealState()) {
+                                Log.d("InfoFlow", "${articleInfoWithState.info.title} clicked")
+                                fullScreenArticleId = articleInfoWithState.info.articleId
+                                showFullScreenArticle = true
+                                // navController.navigate("article?id=${articleInfoWithState.info.articleId}")
+                            }
+                        },
+                        onExpand = {
+                            if (!isRevealed && !resetAllArticlesRevealState()) {
+                                Log.d("InfoFlow", "${articleInfoWithState.info.title} revealed")
+                                revealedId = item.info.articleId
+                            }
+                        },
+                        onCollapse = {
+                            if (isRevealed) {
+                                Log.d("InfoFlow", "${articleInfoWithState.info.title} collapse")
+                                revealedId = -1
+                            }
+                        },
+                    )
+                }
             }
         }
     }

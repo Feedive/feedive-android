@@ -1,84 +1,180 @@
 package cn.svecri.feedive.ui.main
 
 import android.annotation.SuppressLint
+import android.app.Application
+import android.content.Context
+import android.content.SharedPreferences
+import android.graphics.PixelFormat
+import android.os.Parcelable
 import android.util.Log
+import android.view.View
+import android.view.WindowManager
 import android.webkit.WebSettings
 import androidx.compose.foundation.layout.*
-import androidx.compose.material.LinearProgressIndicator
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.setValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
+import androidx.compose.material.*
+import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.snapshots.Snapshot.Companion.observe
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.AbstractComposeView
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.lifecycle.*
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import androidx.navigation.compose.rememberNavController
+import androidx.savedstate.ViewTreeSavedStateRegistryOwner
+import cn.svecri.feedive.R
+import cn.svecri.feedive.data.AppDatabase
+import cn.svecri.feedive.data.Article
+import cn.svecri.feedive.data.Article.Companion.fromRss
+import cn.svecri.feedive.data.Feed
 import cn.svecri.feedive.model.RssArticle
 import cn.svecri.feedive.model.ArticleCategory
 import cn.svecri.feedive.model.ArticleGuid
 import cn.svecri.feedive.model.ArticleSource
 import cn.svecri.feedive.ui.theme.FeediveTheme
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.parcelize.Parcelize
+import java.io.Reader
+import java.util.*
 
-@SuppressLint("SetJavaScriptEnabled")
+@Parcelize
+data class ReaderSettings(
+    var textSize:Int,
+    val lineIndent: Int,
+    val theme:String?,
+): Parcelable
+
+class ArticleViewModel(application: Application) : AndroidViewModel(application) {
+    private val appDatabase = AppDatabase.getInstance(application)
+    private val articleDao = appDatabase.articleDao()
+    var rssArticle by mutableStateOf<RssArticle?>(null)
+        private set
+    var loading by mutableStateOf<Boolean>(true)
+        private set
+    @JvmName("setRssArticle1")
+    fun setRssArticle(article:RssArticle){
+        rssArticle = article
+    }
+    @JvmName("setLoading1")
+    fun setLoading(flag:Boolean){
+        loading = flag
+    }
+    fun queryArticleById(id: Int){
+        viewModelScope.launch {
+            val article: Article = articleDao.queryArticleById(id).get(0)
+
+            setRssArticle(RssArticle(
+                title = article.title,
+                link = article.link,
+                description = article.description,
+                author = article.author,
+                category = ArticleCategory(
+                    domain = article.categoryDomain,
+                    category = article.category
+                ),
+                comment = "",
+                pubDate = article.pubDate,
+                guid = ArticleGuid(isPermaLink = article.isPermaLink, value = article.guid),
+                source = ArticleSource(url = "", name = article.sourceName)
+            ))
+            setLoading(false)
+        }
+    }
+    //todo: webView Settings
+//    private
+}
+
+@SuppressLint("SetJavaScriptEnabled", "CommitPrefEdits")
 @Composable
-fun ArticleView(link:String,navController: NavController){
-    var rememberWebViewProgress:Int by remember { mutableStateOf(-1) }
+fun ArticleView(
+    articleId:Int,
+    vm:ArticleViewModel = viewModel()
+){
+    val loading = vm.loading
+    val rssArticle = vm.rssArticle
+    vm.queryArticleById(articleId)
 
-    Box {
-        CustomWebView(
-            modifier = Modifier.fillMaxSize(),
-            url = link,
-//            htmlStr = generateHtmlStr(article = article),
-            onProgressChange = { progress ->
-                rememberWebViewProgress = progress
-            },
-            initSettings = { settings ->
-                settings?.apply {
-                    //支持js交互
-                    javaScriptEnabled = true
-                    //将图片调整到适合webView的大小
-                    useWideViewPort = true
-                    //缩放至屏幕的大小
-                    loadWithOverviewMode = true
-                    //缩放操作
-                    setSupportZoom(true)
-                    builtInZoomControls = true
-                    displayZoomControls = true
-                    //是否支持通过JS打开新窗口
-                    javaScriptCanOpenWindowsAutomatically = true
-                    //不加载缓存内容
-                    cacheMode = WebSettings.LOAD_NO_CACHE
-                }
-            }, onBack = { webView ->
-                if (webView?.canGoBack() == true) {
-                    webView.goBack()
-                } else {
-                    //finish()
-                    navController.navigateUp()
-                }
-            }, onReceivedError = {
-                Log.d("ArticleView", ">>>>>>${it?.description}")
+    val sharedPref = LocalContext.current.getSharedPreferences("WebViewSettings",Context.MODE_PRIVATE)
+    val userSettings = ReaderSettings(
+        textSize = sharedPref.getInt("textSize",14),
+        lineIndent = sharedPref.getInt("lineIndent",16),
+        theme = sharedPref.getString("theme","yellow"),
+    )
+    Box(
+        Modifier.padding()
+    ){
+        if(loading){
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .fillMaxHeight()
+            ) {
+                CircularProgressIndicator()
             }
-        )
-        LinearProgressIndicator(
-            progress = rememberWebViewProgress * 1.0F / 100F,
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(if (rememberWebViewProgress == 100) 0.dp else 5.dp),
-            color = Color.Red
-        )
+        }
+        else{
+            rssArticle?.let {
+                Log.d("ArticleView",it.description)
+                CustomWebView(
+                    modifier = Modifier.fillMaxSize(),
+                    //            url = link,
+                    articleTitle = it.title,
+                    htmlStr = generateHtmlStr(it,userSettings),
+                    initSettings = { settings ->
+                        settings?.apply {
+                            //支持js交互
+                            javaScriptEnabled = true
+                            //将图片调整到适合webView的大小
+                            //useWideViewPort = true
+                            //缩放至屏幕的大小
+                            loadWithOverviewMode = true
+                            //缩放操作
+                            setSupportZoom(false)
+                            builtInZoomControls = true
+                            displayZoomControls = true
+                            //是否支持通过JS打开新窗口
+                            javaScriptCanOpenWindowsAutomatically = true
+                            //加载缓存内容
+                            cacheMode = WebSettings.LOAD_DEFAULT
+                            allowFileAccess = true
+                            allowContentAccess = true
+                            domStorageEnabled = true
+                            databaseEnabled = true
+                            textZoom = 100
+                        }
+                    },
+                    onBack = { webView ->
+                        if (webView?.canGoBack() == true) {
+                            webView.goBack()
+                        }
+                    },
+                    onReceivedError = {
+                        Log.d("ArticleView", ">>>>>>${it?.description}")
+                    }
+                )
+            }
+        }
     }
 }
+
+
 
 @Preview(showBackground = true)
 @Composable
 fun ArticlePreview() {
     FeediveTheme {
-//        Text("231")
-        val navController = rememberNavController()
         val article = RssArticle(
             title = "干货 | 论文解读：基于动态词表的对话生成研究",
             link = "http://blog.sina.com.cn/s/blog_4caedc7a0102x3o1.html",
@@ -90,114 +186,450 @@ fun ArticlePreview() {
             guid = ArticleGuid(),
             source = ArticleSource("MSRA")
         )
-        ArticleView(article.link, navController = navController)
+        ArticleView(articleId = article.hashCode())
+    }
+}
+
+@Preview
+@Composable
+fun ProgressCircularLoopDemo() {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier
+            .fillMaxWidth()
+            .fillMaxHeight()
+    ) {
+        CircularProgressIndicator()
     }
 }
 
 //TODO：生成网页的样式修改
-fun generateHtmlStr(rssArticle: RssArticle): String {
-    val styleStr = "<style>\n" +
-            "*{\n" +
-            "  margin: 0;\n" +
-            "  padding: 0;\n" +
-            "  border: 0;\n" +
-            "  color: #333;\n" +
-            "  font-family: \"\\5FAE\\8F6F\\96C5\\9ED1\", Arial;\n" +
-            "}\n" +
-            "html {\n" +
-            "  -webkit-font-smoothing: antialiased;\n" +
-            "  -webkit-text-size-adjust: 100%;\n" +
-            "  background: #F2F2F2;\n" +
-            "  font-size: 3em;\n" +
-            "}\n" +
-            "body {\n" +
-            "  min-width: 320px;\n" +
-            "  margin: 0 0;\n" +
-            "  padding:4cm 2cm 4cm 2cm;\n" +
-            "}\n" +
-            "#main{\n" +
-            "  word-wrap: break-word;\n" +
-            "  word-break: normal;\n" +
-            "  line-height: 1.5em;\n" +
-            "}\n" +
-            "p {\n" +
-            "  margin: 0em 0em 0.5em 0em;\n" +
-            "  text-indent: 0em;\n" +
-            "}\n" +
-            "a {\n" +
-            "  text-decoration: none;\n" +
-            "  color: #333;\n" +
-            "  -webkit-tap-highlight-color: rgba(255, 255, 255, 0);\n" +
-            "  -webkit-user-select: none;\n" +
-            "  -moz-user-focus: none;\n" +
-            "  -moz-user-select: none;\n" +
-            "}\n" +
-            "table {\n" +
-            "  border: 0;\n" +
-            "  margin: 0;\n" +
-            "  border-collapse: collapse;\n" +
-            "  border-spacing: 0;\n" +
-            "}\n" +
-            "table th,\n" +
-            "table td {\n" +
-            "  border: 0;\n" +
-            "}\n" +
-            "img {\n" +
-            "  border: 0;\n" +
-            "  margin: auto;\n" +
-            "  vertical-align: top;\n" +
-            "  height: auto; \n" +
-            "  width: auto\\9; \n" +
-            "  width:100%;\n" +
-            "}\n" +
-            "i,\n" +
-            "em {\n" +
-            "  font-style: normal;\n" +
-            "}\n" +
-            "ol,\n" +
-            "ul,\n" +
-            "li {\n" +
-            "  list-style: none;\n" +
-            "}\n" +
-            "input,\n" +
-            "textarea,\n" +
-            "select,\n" +
-            "button {\n" +
-            "  padding: 0 ;\n" +
-            "  margin: 0;\n" +
-            "  outline: none;\n" +
-            "  font-family: \"\\5FAE\\8F6F\\96C5\\9ED1\", Arial;\n" +
-            "}\n" +
-            "input[type=\"submit\"] {\n" +
-            "  appearance: none;\n" +
-            "  -moz-appearance: none;\n" +
-            "  -webkit-appearance: none;\n" +
-            "  /*去除input默认样式*/\n" +
-            "}\n" +
-            "input {\n" +
-            "  appearance: none;\n" +
-            "  -moz-appearance: none;\n" +
-            "  -webkit-appearance: none;\n" +
-            "  /*去除input默认样式*/\n" +
-            "}\n" +
-            "h1,\n" +
-            "h2,\n" +
-            "h3,\n" +
-            "h4,\n" +
-            "h5,\n" +
-            "h6 {\n" +
-            "  font-weight: normal;\n" +
-            "}\n" +
-            "</style>"
-    val htmlStr = "<html> \n" +
+fun generateHtmlStr(rssArticle: RssArticle,userSettings: ReaderSettings): String {
+    val textSize = userSettings.textSize.toString()
+    val lineIndent = userSettings.lineIndent.toString()
+    val theme = userSettings.theme
+    var bgColor = ""
+    var textColor = ""
+    when(theme){
+        "white"->{
+            bgColor = "#FFFFFF"
+            textColor = "#000000"
+        }
+        "yellow"->{
+            bgColor = "#e9dfc7"
+            textColor = "#000000"
+        }
+        "green"->{
+            bgColor = "#ADD678"
+            textColor = "#000000"
+        }
+        "black"->{
+            bgColor = "#696969"
+            textColor = "#FFFFFF"
+        }
+        "blue"->{
+            bgColor = "#336699"
+            textColor = "#FFFFFF"
+        }
+    }
+
+   val styleStr = "<style>\n" +
+           "      *[hidefocus],\n" +
+           "      input,\n" +
+           "      textarea,\n" +
+           "      a {\n" +
+           "        outline: none;\n" +
+           "      }\n" +
+           "      body,\n" +
+           "      div,\n" +
+           "      dl,\n" +
+           "      dt,\n" +
+           "      dd,\n" +
+           "      ul,\n" +
+           "      ol,\n" +
+           "      li,\n" +
+           "      h1,\n" +
+           "      h2,\n" +
+           "      h3,\n" +
+           "      h4,\n" +
+           "      h5,\n" +
+           "      h6,\n" +
+           "      pre,\n" +
+           "      form,\n" +
+           "      fieldset,\n" +
+           "      input,\n" +
+           "      textarea,\n" +
+           "      p,\n" +
+           "      blockquote,\n" +
+           "      th,\n" +
+           "      td {\n" +
+           "        padding: 0;\n" +
+           "        margin: 0;\n" +
+           "      }\n" +
+           "      fieldset,\n" +
+           "      img,\n" +
+           "      html,\n" +
+           "      body,\n" +
+           "      iframe {\n" +
+           "        border: 0;\n" +
+           "      }\n" +
+           "      table {\n" +
+           "        border-collapse: collapse;\n" +
+           "        border-spacing: 0;\n" +
+           "      }\n" +
+           "      li {\n" +
+           "        list-style: none;\n" +
+           "      }\n" +
+           "      h1,\n" +
+           "      h2,\n" +
+           "      h3,\n" +
+           "      h4,\n" +
+           "      h5,\n" +
+           "      h6 {\n" +
+           "        font-size: 100%;\n" +
+           "      }\n" +
+           "      caption,\n" +
+           "      th {\n" +
+           "        font-weight: normal;\n" +
+           "        font-style: normal;\n" +
+           "        text-align: left;\n" +
+           "      }\n" +
+           "      em,\n" +
+           "      strong {\n" +
+           "        font-weight: bold;\n" +
+           "        font-style: normal;\n" +
+           "      }\n" +
+           "      body,\n" +
+           "      textarea,\n" +
+           "      select,\n" +
+           "      input,\n" +
+           "      pre {\n" +
+           "        font-family: arial, microsoft yahei, helvetica, sans-serif;\n" +
+           "        font-size: 14px;\n" +
+           "        color: #555;\n" +
+           "      }\n" +
+           "      body {\n" +
+           "        line-height: 1.5em;\n" +
+           "        -webkit-text-size-adjust: none;\n" +
+           "      }\n" +
+           "      a,\n" +
+           "      button {\n" +
+           "        cursor: pointer;\n" +
+           "      }\n" +
+           "      textarea {\n" +
+           "        resize: none;\n" +
+           "        overflow: auto;\n" +
+           "      }\n" +
+           "      pre {\n" +
+           "        white-space: pre-wrap;\n" +
+           "      }\n" +
+           "      a {\n" +
+           "        color: #333;\n" +
+           "        text-decoration: none;\n" +
+           "      }\n" +
+           "      input {\n" +
+           "        -webkit-tap-highlight-color: rgba(255, 255, 255, 0);\n" +
+           "        -webkit-user-modify: read-white-plaintext-only;\n" +
+           "      }\n" +
+           "      button {\n" +
+           "        -webkit-tap-highlight-color: rgba(255, 255, 255, 0);\n" +
+           "      }\n" +
+           "      html {\n" +
+           "        width: 100%;\n" +
+           "        height: 100%;\n" +
+           "        overflow-x: hidden;\n" +
+           "      }\n" +
+           "      body {\n" +
+           "        text-align: left;\n" +
+           "        width: 100%;\n" +
+           "        overflow: hidden;\n" +
+           "        background: "+ bgColor +";\n" +
+           "      }\n" +
+           "      p {\n" +
+           "        text-indent: 2em;\n" +
+           "        margin: 0.5em 0;\n" +
+           "        letter-spacing: 0px;\n" +
+           "        line-height: "+(textSize.toInt()+lineIndent.toInt()).toString() +"px;\n" +
+           "        font-size: "+ textSize +"px;\n" +
+           "        background-color: "+ bgColor +";"+
+           "        color: " + textColor +";" +
+           "      }\n" +
+           "      img {\n" +
+           "        max-width: 100%;\n" +
+           "        height: auto;\n" +
+           "      }\n" +
+           "      #main {\n" +
+           "        font-size: "+ textSize +"px;\n" +
+           "        color: "+ textColor +";\n" +
+           "        line-height: "+(textSize.toInt()+lineIndent.toInt()).toString() +"px;\n" +
+           "        padding: 15px;\n" +
+           "      }\n" +
+           "      .nav-pannel-bk {\n" +
+           "        position: fixed;\n" +
+           "        bottom: 0px;\n" +
+           "        height: 150px;\n" +
+           "        width: 100%;\n" +
+           "        background: #000;\n" +
+           "        opacity: 0.9;\n" +
+           "        z-index: 10000;\n" +
+           "      }\n" +
+           "\n" +
+           "      .nav-pannel {\n" +
+           "        position: fixed;\n" +
+           "        bottom: 0px;\n" +
+           "        height: 150px;\n" +
+           "        widows: 100%;\n" +
+           "        background: none;\n" +
+           "        color: #fff;\n" +
+           "        flex-direction: column;\n" +
+           "        z-index: 10001;\n" +
+           "      }\n" +
+           "\n" +
+           "      .child-mod {\n" +
+           "        padding: 5px 10px;\n" +
+           "        margin: 1px 15px;\n" +
+           "      }\n" +
+           "\n" +
+           "      .bk-container {\n" +
+           "        position: relative;\n" +
+           "        width: 30px;\n" +
+           "        height: 30px;\n" +
+           "        border-radius: 15px;\n" +
+           "        background: #ffffff;\n" +
+           "        display: inline-block;\n" +
+           "        vertical-align: -14px;\n" +
+           "        margin-left: 10px;\n" +
+           "      }\n" +
+           "\n" +
+           "      .bk-container-current {\n" +
+           "        position: absolute;\n" +
+           "        width: 32px;\n" +
+           "        height: 32px;\n" +
+           "        border-radius: 16px;\n" +
+           "        border: 1px #ff7800 solid;\n" +
+           "        display: inline-block;\n" +
+           "        top: -2px;\n" +
+           "        left: -2px;\n" +
+           "      }\n" +
+           "\n" +
+           "      .child-mod span {\n" +
+           "        display: inline-block;\n" +
+           "        padding-right: 20px;\n" +
+           "        padding-left: 10px;\n" +
+           "      }\n" +
+           "\n" +
+           "      .child-mod button {\n" +
+           "        border-radius: 16px;\n" +
+           "        background: none;\n" +
+           "        border: 1px #c8c8c8 solid;\n" +
+           "        padding: 5px 40px;\n" +
+           "        color: #fff;\n" +
+           "      }\n" +
+           "\n" +
+           "      .child-mod button:nth-child(2) {\n" +
+           "        margin-right: 10px;\n" +
+           "      }\n" +
+           "      .child-mod div:nth-child(3) {\n" +
+           "        background: #e9dfc7;\n" +
+           "      }\n" +
+           "\n" +
+           "      .child-mod div:nth-child(4) {\n" +
+           "        background: #add678;\n" +
+           "      }\n" +
+           "\n" +
+           "      .child-mod div:nth-child(5) {\n" +
+           "        background: #696969;\n" +
+           "      }\n" +
+           "      .child-mod div:nth-child(6) {\n" +
+           "        background: #336699;\n" +
+           "      }\n" +
+           "\n" +
+           "      .icon-text {\n" +
+           "        position: absolute;\n" +
+           "        top: 25px;\n" +
+           "        font-size: 10px;\n" +
+           "      }\n" +
+           "    </style>"
+        val settingJS = "<script>\n" +
+            "  var main = document.getElementById(\"main\");\n" +
+            "  var p = document.getElementsByTagName(\"p\");\n" +
+            "  var body = document.getElementById(\"body\");\n" +
+            "\n" +
+            "  var config_panel = document.getElementById(\"font-container\");\n" +
+            "  var config_panel_bk = document.getElementById(\"nav-pannel-bk\");\n" +
+            "\n" +
+            "  var text_size = "+ textSize + ";\n" +
+            "  var line_indent = "+ lineIndent +";\n" +
+            "  var theme = \""+ theme +"\";\n" +
+            "\n" +
+            "  var large_font = document.getElementById(\"large-font\");\n" +
+            "  var small_font = document.getElementById(\"small-font\");\n" +
+            "  var large_indent = document.getElementById(\"large-indent\");\n" +
+            "  var small_indent = document.getElementById(\"small-indent\");\n" +
+            "  large_font.onclick = text_size_inc;\n" +
+            "  small_font.onclick = text_size_dec;\n" +
+            "  large_indent.onclick = line_indent_inc;\n" +
+            "  small_indent.onclick = line_indent_dec;\n" +
+            "  function updateText() {\n" +
+            "    main.style.fontSize = text_size + \"px\";\n" +
+            "    main.style.lineHeight = text_size + line_indent + \"px\";\n" +
+            "    for (var item = 0; item < p.length; item++) {\n" +
+            "      p[item].style.fontSize = text_size + \"px\";\n" +
+            "      p[item].style.lineHeight = text_size + line_indent + \"px\";\n" +
+            "    }\n" +
+            "    store();\n" +
+            "  }\n" +
+            "  function text_size_inc() {\n" +
+            "    if (text_size < 30) text_size++;\n" +
+            "    updateText();\n" +
+            "  }\n" +
+            "  function text_size_dec() {\n" +
+            "    if (text_size > 8) text_size--;\n" +
+            "    updateText();\n" +
+            "  }\n" +
+            "  function line_indent_inc() {\n" +
+            "    if (line_indent < 30) line_indent++;\n" +
+            "    updateText();\n" +
+            "  }\n" +
+            "  function line_indent_dec() {\n" +
+            "    if (line_indent > 2) line_indent--;\n" +
+            "    updateText();\n" +
+            "  }\n" +
+            "  function show() {\n" +
+            "    config_panel.style.display = \"flex\";\n" +
+            "    config_panel_bk.style.display = \"flex\";\n" +
+                "store();\n"+
+            "  }\n" +
+            "  function dismiss() {\n" +
+            "    config_panel.style.display = \"none\";\n" +
+            "    config_panel_bk.style.display = \"none\";\n" +
+            "  }\n" +
+            "  var bk_container_white = document.getElementById(\"bk_container_white\");\n" +
+            "  var bk_container_yellow = document.getElementById(\"bk_container_yellow\");\n" +
+            "  var bk_container_green = document.getElementById(\"bk_container_green\");\n" +
+            "  var bk_container_black = document.getElementById(\"bk_container_black\");\n" +
+            "  var bk_container_blue = document.getElementById(\"bk_container_blue\");\n" +
+            "  bk_container_white.onclick = bgcolor_white;\n" +
+            "  bk_container_yellow.onclick = bgcolor_yellow;\n" +
+            "  bk_container_green.onclick = bgcolor_green;\n" +
+            "  bk_container_black.onclick = bgcolor_black;\n" +
+            "  bk_container_blue.onclick = bgcolor_blue;\n" +
+            "  function bgcolor_white() {\n" +
+            "    theme = \"white\";\n" +
+            "    background_color(\"#FFFFFF\");\n" +
+            "    text_color(\"#000000\");\n" +
+            "    store();\n" +
+            "  }\n" +
+            "  function bgcolor_yellow() {\n" +
+            "    theme = \"yellow\";\n" +
+            "    background_color(\"#e9dfc7\");\n" +
+            "    text_color(\"#000000\");\n" +
+                "    store();\n" +
+            "  }\n" +
+            "  function bgcolor_green() {\n" +
+            "    theme = \"green\";\n" +
+            "    background_color(\"#ADD678\");\n" +
+            "    text_color(\"#000000\");\n" +
+                "    store();\n" +
+            "  }\n" +
+            "  function bgcolor_black() {\n" +
+            "    theme = \"black\";\n" +
+            "    background_color(\"#696969\");\n" +
+            "    text_color(\"#FFFFFF\");\n" +
+                "    store();\n" +
+            "  }\n" +
+            "  function bgcolor_blue() {\n" +
+            "    theme = \"blue\";\n" +
+            "    background_color(\"#336699\");\n" +
+            "    text_color(\"#FFFFFF\");\n" +
+                "    store();\n" +
+            "  }\n" +
+            "  function background_color(color) {\n" +
+            "    body.style.background = color;\n" +
+            "    for (var item = 0; item < p.length; item++) {\n" +
+            "      p[item].style.backgroundColor = color;\n" +
+            "    }\n" +
+            "  }\n" +
+            "  function text_color(color) {\n" +
+            "    main.style.color = color;\n" +
+            "    for (var item = 0; item < p.length; item++) {\n" +
+            "      p[item].style.cssText += \"color:\" + color + \";\";\n" +
+            "    }\n" +
+            "  }\n" +
+            "\n" +
+            "  function store() {\n" +
+                "android.spstore(text_size,line_indent,theme);\n" +
+            "  }\n" +
+            "\n" +
+            "  function initial() {\n" +
+            "    switch (theme) {\n" +
+            "      case \"white\":\n" +
+            "        bgcolor_white();\n" +
+            "        break;\n" +
+            "      case \"yellow\":\n" +
+            "        bgcolor_yellow();\n" +
+            "        break;\n" +
+            "      case \"green\":\n" +
+            "        bgcolor_green();\n" +
+            "        break;\n" +
+            "      case \"black\":\n" +
+            "        bgcolor_black();\n" +
+            "        break;\n" +
+            "      case \"blue\":\n" +
+            "        bgcolor_blue();\n" +
+            "        break;\n" +
+            "      default:\n" +
+            "        bgcolor_yellow();\n" +
+            "    }\n" +
+            "    updateText();\n" +
+            "  }\n" +
+            "\n" +
+            "  window.onload = function () {\n" +
+            "    initial();\n" +
+            "  };\n" +
+            "</script>\n"
+        val htmlStr = "<html> \n" +
             "<head> \n" +
             "<title>${rssArticle.title}</title>" +
             styleStr +
+            "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1,user-scalable=no,minimal-ui\">\n" +
+            "<meta name=\"format-detection\" content=\"telephone=no\">" +
             "</head> \n" +
-            "<body>" +
-            "<div id=\"title\"><h2 align=\"center\">${rssArticle.title}</h2></div>" +
+            "<body id=\"body\">" +
             "<div id=\"main\">${rssArticle.description}</div>" +
+            "<div id=\"nav-pannel-bk\" class=\"nav-pannel-bk\" style=\"display: none\"></div>\n" +
+            "    <div id=\"font-container\" class=\"nav-pannel\" style=\"display: none\">\n" +
+            "      <div class=\"child-mod\">\n" +
+            "        <span>字号</span>\n" +
+            "        <button id=\"large-font\" class=\"size-button\">大</button>\n" +
+            "        <button id=\"small-font\" class=\"size-button\">小</button>\n" +
+            "      </div>\n" +
+            "      <div class=\"child-mod\">\n" +
+            "        <span>行距</span>\n" +
+            "        <button id=\"large-indent\" class=\"size-button\">大</button>\n" +
+            "        <button id=\"small-indent\" class=\"size-button\">小</button>\n" +
+            "      </div>\n" +
+            "      <div class=\"child-mod\">\n" +
+            "        <span>背景</span>\n" +
+            "        <div class=\"bk-container\" id=\"bk_container_white\">\n" +
+            "          <div class=\"bk-container-current\"></div>\n" +
+            "        </div>\n" +
+            "        <div class=\"bk-container\" id=\"bk_container_yellow\">\n" +
+            "          <div class=\"bk-container-current\"></div>\n" +
+            "        </div>\n" +
+            "        <div class=\"bk-container\" id=\"bk_container_green\">\n" +
+            "          <div class=\"bk-container-current\"></div>\n" +
+            "        </div>\n" +
+            "        <div class=\"bk-container\" id=\"bk_container_black\">\n" +
+            "          <div class=\"bk-container-current\"></div>\n" +
+            "        </div>\n" +
+            "        <div class=\"bk-container\" id=\"bk_container_blue\">\n" +
+            "          <div class=\"bk-container-current\"></div>\n" +
+            "        </div>\n" +
+            "      </div>\n" +
+            "    </div>" +
             "</body>" +
-            "</html>"
+            "</html>" + settingJS
+
     return htmlStr
 }
