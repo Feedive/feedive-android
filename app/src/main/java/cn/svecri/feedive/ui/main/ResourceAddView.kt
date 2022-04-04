@@ -59,23 +59,6 @@ class GroupsViewModel : ViewModel() {
     }
 }
 
-class ResourceManagerViewModel(application: Application) : AndroidViewModel(application) {
-    private val appDatabase = AppDatabase.getInstance(application)
-    private val feedDao = appDatabase.feedDao()
-
-    var isAddViewShow by mutableStateOf(false)
-
-    fun insertFeed(feed: Feed) {
-        viewModelScope.launch(Dispatchers.IO) {
-            feedDao.insertFeed(feed = feed)
-        }
-    }
-
-    fun setIsAddViewShow(isShow: Boolean) {
-        isAddViewShow = isShow
-    }
-}
-
 @Composable
 fun MultiSelectRow(groupRow: GroupRow, onSwitchCheckBox: (GroupRow) -> Unit) {
     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -181,24 +164,6 @@ fun GroupSelectDialog(showDialog: Boolean, setShowDialog: (Boolean) -> Unit) {
 
 }
 
-@Composable
-fun ResourceManagerView(navController: NavController, vm: ResourceManagerViewModel = viewModel()) {
-    FeediveTheme {
-        Scaffold(
-            topBar = {
-                TopAppBar(title = { Text(text = "ResourceManage") },
-                    navigationIcon = {
-                        IconButton(
-                            onClick = { vm.setIsAddViewShow(true) }) {
-                            Icon(Icons.Outlined.Add, contentDescription = "AddResource")
-                        }
-                    })
-            })
-        {
-            ResourceAddDialog(vm)
-        }
-    }
-}
 
 @Composable
 fun ResourceAddDialog(vm: ResourceManagerViewModel = viewModel()) {
