@@ -167,95 +167,92 @@ fun GroupSelectDialog(showDialog: Boolean, setShowDialog: (Boolean) -> Unit) {
 
 @Composable
 fun ResourceAddDialog(vm: ResourceManagerViewModel = viewModel()) {
-    if (vm.isAddViewShow) {
-        Box {
-            val (showSelectDialog, setShowSelectDialog) = remember { mutableStateOf(false) }
-            Column(
-                Modifier
-                    .fillMaxWidth(1f)
-                    .height(800.dp)
-                    .background(Color.White)
-                    .padding(horizontal = 24.dp, vertical = 20.dp),
-                verticalArrangement = Arrangement.SpaceAround,
-                horizontalAlignment = Alignment.CenterHorizontally
+    Box {
+        val (showSelectDialog, setShowSelectDialog) = remember { mutableStateOf(false) }
+        Column(
+            Modifier
+                .fillMaxWidth(1f)
+                .height(800.dp)
+                .background(Color.White)
+                .padding(horizontal = 24.dp, vertical = 20.dp),
+            verticalArrangement = Arrangement.SpaceAround,
+            horizontalAlignment = Alignment.CenterHorizontally
 
-            ) {
-                Text(
-                    text = "Add resource",
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.Bold
-                )
-                var nameText by remember { mutableStateOf("") }
-                OutlinedTextField(
-                    value = nameText,
-                    onValueChange = { nameText = it },
-                    label = { Text("Name") }
-                )
-                var urlText by remember { mutableStateOf("") }
-                OutlinedTextField(
-                    value = urlText,
-                    onValueChange = { urlText = it },
-                    label = { Text("URL") }
-                )
-                var feedType by remember { mutableStateOf("") }
-                OutlinedTextField(
-                    value = feedType,
-                    onValueChange = { feedType = it },
-                    label = { Text("Type") }
-                )
-                var feedPriority by remember { mutableStateOf("") }
-                OutlinedTextField(
-                    value = feedPriority,
-                    onValueChange = { feedPriority = it },
-                    label = { Text("Priority") }
-                )
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(text = "Group: ")
-                    Spacer(Modifier.size(16.dp))
-                    Button(onClick = { setShowSelectDialog(true) }) {
-                        Text(text = "choose...")
-                    }
-                    GroupSelectDialog(
-                        showDialog = showSelectDialog,
-                        setShowDialog = setShowSelectDialog
-                    )
+        ) {
+            Text(
+                text = "Add resource",
+                fontSize = 20.sp,
+                fontWeight = FontWeight.Bold
+            )
+            var nameText by remember { mutableStateOf("") }
+            OutlinedTextField(
+                value = nameText,
+                onValueChange = { nameText = it },
+                label = { Text("Name") }
+            )
+            var urlText by remember { mutableStateOf("") }
+            OutlinedTextField(
+                value = urlText,
+                onValueChange = { urlText = it },
+                label = { Text("URL") }
+            )
+            var feedType by remember { mutableStateOf("") }
+            OutlinedTextField(
+                value = feedType,
+                onValueChange = { feedType = it },
+                label = { Text("Type") }
+            )
+            var feedPriority by remember { mutableStateOf("") }
+            OutlinedTextField(
+                value = feedPriority,
+                onValueChange = { feedPriority = it },
+                label = { Text("Priority") }
+            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(text = "Group: ")
+                Spacer(Modifier.size(16.dp))
+                Button(onClick = { setShowSelectDialog(true) }) {
+                    Text(text = "choose...")
                 }
-                Row(
-                    Modifier.fillMaxWidth(1f),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceAround
-                ) {
-                    Button(
-                        onClick = { vm.setIsAddViewShow(false) },
-                        colors = buttonColors(Color.White),
-                        elevation = ButtonDefaults.elevation(defaultElevation = 0.dp),
-                        border = BorderStroke(0.dp, Color.White)
-                    )
-                    {
-                        Text(text = "Cancel", color = MaterialTheme.colors.primary)
-                    }
-                    Button(
-                        onClick = {
-                            vm.setIsAddViewShow(false)
-                            vm.insertFeed(
-                                Feed(
-                                    0,
-                                    feedName = nameText,
-                                    feedType = feedType,
-                                    feedUrl = urlText,
-                                    feedPriority = feedPriority.toInt()
-                                )
+                GroupSelectDialog(
+                    showDialog = showSelectDialog,
+                    setShowDialog = setShowSelectDialog
+                )
+            }
+            Row(
+                Modifier.fillMaxWidth(1f),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceAround
+            ) {
+                Button(
+                    onClick = { vm.setIsAddViewShow(false) },
+                    colors = buttonColors(Color.White),
+                    elevation = ButtonDefaults.elevation(defaultElevation = 0.dp),
+                    border = BorderStroke(0.dp, Color.White)
+                )
+                {
+                    Text(text = "Cancel", color = MaterialTheme.colors.primary)
+                }
+                Button(
+                    onClick = {
+                        vm.setIsAddViewShow(false)
+                        vm.insertFeed(
+                            Feed(
+                                0,
+                                feedName = nameText,
+                                feedType = feedType,
+                                feedUrl = urlText,
+                                feedPriority = feedPriority.toInt()
                             )
-                        },
-                        colors = buttonColors(Color.White),
-                        elevation = ButtonDefaults.elevation(defaultElevation = 0.dp),
-                        border = BorderStroke(0.dp, Color.White)
-                    ) {
-                        Text(text = "OK", color = MaterialTheme.colors.primary)
-                    }
+                        )
+                    },
+                    colors = buttonColors(Color.White),
+                    elevation = ButtonDefaults.elevation(defaultElevation = 0.dp),
+                    border = BorderStroke(0.dp, Color.White)
+                ) {
+                    Text(text = "OK", color = MaterialTheme.colors.primary)
                 }
             }
         }
     }
-
 }
