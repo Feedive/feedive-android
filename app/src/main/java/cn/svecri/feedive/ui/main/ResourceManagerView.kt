@@ -4,10 +4,7 @@ import android.app.Application
 import androidx.compose.material.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.*
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -34,6 +31,7 @@ class ResourceManagerViewModel(application: Application) : AndroidViewModel(appl
         isAddViewShow = isShow
     }
 }
+
 @Composable
 fun ResourceManagerView(navController: NavController, vm: ResourceManagerViewModel = viewModel()) {
     FeediveTheme {
@@ -48,7 +46,13 @@ fun ResourceManagerView(navController: NavController, vm: ResourceManagerViewMod
                     })
             })
         {
-            ResourceAddDialog(vm)
+            if (vm.isAddViewShow) {
+                ResourceAddDialog(vm)
+            } else {
+                ResourceList()
+                ResourceManagerBottomBar()
+            }
         }
     }
 }
+
