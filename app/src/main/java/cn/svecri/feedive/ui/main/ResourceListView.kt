@@ -40,6 +40,8 @@ class ResourceListViewModel : ViewModel() {
 
     var curResourceName = mutableStateOf("")
 
+    private var curResourceRowData = ResourceRowData()
+
     fun changeCurrentResourceName(newName: String) {
         curResourceName.value = newName
     }
@@ -48,10 +50,15 @@ class ResourceListViewModel : ViewModel() {
         resourceData.isChecked.value = !resourceData.isChecked.value
     }
 
-    fun changeName(resourceData: ResourceRowData) {
+    fun openChangeNameDialog(resourceData: ResourceRowData) {
         setIsShowNameChangeDialog(true)
-        curResourceName = resourceData.resourceName
+        curResourceRowData = resourceData
+        curResourceName = mutableStateOf(resourceData.resourceName.value)
+    }
 
+    fun updateResourceName() {
+        curResourceRowData.resourceName = curResourceName
+        /*TODO: uodate db*/
     }
 
     fun switchEnable(resourceData: ResourceRowData) {
@@ -106,9 +113,9 @@ fun NameChangeDialog(
     showDialog: Boolean,
     setShowDialog: (Boolean) -> Unit,
     nameText: String,
-    setNameText: (String) -> Unit
+    setNameText: (String) -> Unit,
+    updateResourceName: () -> Unit
 ) {
-
     if (showDialog) {
         Dialog(
             onDismissRequest = {
@@ -142,7 +149,9 @@ fun NameChangeDialog(
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.Center,
-                    modifier = Modifier.fillMaxWidth(1f).padding(8.dp)
+                    modifier = Modifier
+                        .fillMaxWidth(1f)
+                        .padding(8.dp)
                 ) {
                     OutlinedTextField(
                         value = nameText,
@@ -167,8 +176,8 @@ fun NameChangeDialog(
                     }
                     Button(
                         onClick = {
+                            updateResourceName()
                             setShowDialog(false)
-                            /*TODO*/
                         },
                         colors = ButtonDefaults.buttonColors(Color.White),
                         elevation = ButtonDefaults.elevation(defaultElevation = 0.dp),
@@ -192,7 +201,8 @@ fun ResourceList(vm: ResourceListViewModel = viewModel()) {
         showDialog = vm.isShowNameChangeDialog.value,
         setShowDialog = vm::setIsShowNameChangeDialog,
         nameText = vm.curResourceName.value,
-        setNameText = vm::changeCurrentResourceName
+        setNameText = vm::changeCurrentResourceName,
+        updateResourceName = vm::updateResourceName
     )
     LazyColumn {
         items(items = resourceList) { item ->
@@ -200,7 +210,7 @@ fun ResourceList(vm: ResourceListViewModel = viewModel()) {
                 rowData = item,
                 onCheckedChange = onSwitchChecked,
                 onEnableChange = vm::switchEnable,
-                onNameChanged = vm::changeName
+                onNameChanged = vm::openChangeNameDialog
             )
             Divider()
         }
