@@ -1,20 +1,26 @@
 package cn.svecri.feedive.ui.main
 
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.MutableState
-import androidx.compose.runtime.mutableStateListOf
-import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.window.SecureFlagPolicy
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewmodel.compose.viewModel
 
@@ -30,16 +36,30 @@ class ResourceListViewModel : ViewModel() {
         ResourceRowData(mutableStateOf("2"))
     )
 
+    var isShowNameChangeDialog = mutableStateOf(false)
+
+    var curResourceName = mutableStateOf("")
+
+    fun changeCurrentResourceName(newName: String) {
+        curResourceName.value = newName
+    }
+
     fun switchChecked(resourceData: ResourceRowData) {
         resourceData.isChecked.value = !resourceData.isChecked.value
     }
 
-    fun changeName(resourceData: ResourceRowData, newName: String) {
-        resourceData.resourceName.value = newName
+    fun changeName(resourceData: ResourceRowData) {
+        setIsShowNameChangeDialog(true)
+        curResourceName = resourceData.resourceName
+
     }
 
     fun switchEnable(resourceData: ResourceRowData) {
         resourceData.isEnabled.value = !resourceData.isEnabled.value
+    }
+
+    fun setIsShowNameChangeDialog(isShow: Boolean) {
+        isShowNameChangeDialog.value = isShow
     }
 }
 
@@ -48,7 +68,7 @@ fun ResourceRow(
     rowData: ResourceRowData,
     onCheckedChange: (ResourceRowData) -> Unit,
     onEnableChange: (ResourceRowData) -> Unit,
-    onNameChanged: (ResourceRowData, String) -> Unit
+    onNameChanged: (ResourceRowData) -> Unit
 ) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
@@ -67,7 +87,9 @@ fun ResourceRow(
             modifier = Modifier.width(150.dp)
 
         ) {
-            IconButton(onClick = { /*TODO*/ }) {
+            IconButton(onClick = {
+                onNameChanged(rowData)
+            }) {
                 Icon(Icons.Filled.Edit, contentDescription = "EditName")
             }
             Switch(checked = rowData.isEnabled.value, onCheckedChange = { onEnableChange(rowData) })
@@ -79,11 +101,99 @@ fun ResourceRow(
     }
 }
 
+@Composable
+fun NameChangeDialog(
+    showDialog: Boolean,
+    setShowDialog: (Boolean) -> Unit,
+    nameText: String,
+    setNameText: (String) -> Unit
+) {
+
+    if (showDialog) {
+        Dialog(
+            onDismissRequest = {
+                setShowDialog(false)
+            },
+            properties = DialogProperties(
+                dismissOnBackPress = true,
+                dismissOnClickOutside = true,
+                securePolicy = SecureFlagPolicy.SecureOff
+            )
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .wrapContentHeight()
+                    .padding(horizontal = 15.dp)
+                    .background(
+                        Color.White, shape = RoundedCornerShape(8.dp)
+                    )
+            ) {
+                Spacer(modifier = Modifier.height(10.dp))
+                Text(
+                    text = "Change name",
+                    color = Color.Black,
+                    fontSize = 16.sp,
+                    modifier = Modifier.padding(start = 10.dp),
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center,
+                    modifier = Modifier.fillMaxWidth(1f).padding(8.dp)
+                ) {
+                    OutlinedTextField(
+                        value = nameText,
+                        onValueChange = setNameText,
+                        modifier = Modifier.fillMaxWidth(0.8f)
+                    )
+                }
+
+                Row(
+                    Modifier.fillMaxWidth(1f),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceAround
+                ) {
+                    Button(
+                        onClick = { setShowDialog(false) },
+                        colors = ButtonDefaults.buttonColors(Color.White),
+                        elevation = ButtonDefaults.elevation(defaultElevation = 0.dp),
+                        border = BorderStroke(0.dp, Color.White)
+                    )
+                    {
+                        Text(text = "Cancel", color = MaterialTheme.colors.primary)
+                    }
+                    Button(
+                        onClick = {
+                            setShowDialog(false)
+                            /*TODO*/
+                        },
+                        colors = ButtonDefaults.buttonColors(Color.White),
+                        elevation = ButtonDefaults.elevation(defaultElevation = 0.dp),
+                        border = BorderStroke(0.dp, Color.White)
+                    ) {
+                        Text(text = "OK", color = MaterialTheme.colors.primary)
+                    }
+                }
+            }
+        }
+    }
+
+}
+
 @Preview
 @Composable
 fun ResourceList(vm: ResourceListViewModel = viewModel()) {
     val resourceList = vm.resourceList
     val onSwitchChecked = vm::switchChecked
+    NameChangeDialog(
+        showDialog = vm.isShowNameChangeDialog.value,
+        setShowDialog = vm::setIsShowNameChangeDialog,
+        nameText = vm.curResourceName.value,
+        setNameText = vm::changeCurrentResourceName
+    )
     LazyColumn {
         items(items = resourceList) { item ->
             ResourceRow(

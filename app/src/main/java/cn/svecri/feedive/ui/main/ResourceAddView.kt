@@ -1,7 +1,6 @@
 package cn.svecri.feedive.ui.main
 
 
-import android.app.Application
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.getValue
 import androidx.compose.foundation.BorderStroke
@@ -14,7 +13,6 @@ import androidx.compose.material.*
 import androidx.compose.material.ButtonDefaults.buttonColors
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.outlined.Add
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -27,8 +25,6 @@ import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.window.SecureFlagPolicy
 import androidx.lifecycle.ViewModel
 import androidx.compose.runtime.Composable
-import androidx.lifecycle.AndroidViewModel
-import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import cn.svecri.feedive.data.AppDatabase
