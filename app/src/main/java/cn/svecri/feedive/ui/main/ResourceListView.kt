@@ -21,7 +21,6 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.window.SecureFlagPolicy
-import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewmodel.compose.viewModel
 
 data class ResourceRowData(
@@ -30,45 +29,6 @@ data class ResourceRowData(
     var isEnabled: MutableState<Boolean> = mutableStateOf(true),
 )
 
-class ResourceListViewModel : ViewModel() {
-    var resourceList = mutableStateListOf(
-        ResourceRowData(mutableStateOf("1")),
-        ResourceRowData(mutableStateOf("2"))
-    )
-
-    var isShowNameChangeDialog = mutableStateOf(false)
-
-    var curResourceName = mutableStateOf("")
-
-    private var curResourceRowData = ResourceRowData()
-
-    fun changeCurrentResourceName(newName: String) {
-        curResourceName.value = newName
-    }
-
-    fun switchChecked(resourceData: ResourceRowData) {
-        resourceData.isChecked.value = !resourceData.isChecked.value
-    }
-
-    fun openChangeNameDialog(resourceData: ResourceRowData) {
-        setIsShowNameChangeDialog(true)
-        curResourceRowData = resourceData
-        curResourceName = mutableStateOf(resourceData.resourceName.value)
-    }
-
-    fun updateResourceName() {
-        curResourceRowData.resourceName = curResourceName
-        /*TODO: uodate db*/
-    }
-
-    fun switchEnable(resourceData: ResourceRowData) {
-        resourceData.isEnabled.value = !resourceData.isEnabled.value
-    }
-
-    fun setIsShowNameChangeDialog(isShow: Boolean) {
-        isShowNameChangeDialog.value = isShow
-    }
-}
 
 @Composable
 fun ResourceRow(
@@ -194,7 +154,8 @@ fun NameChangeDialog(
 
 @Preview
 @Composable
-fun ResourceList(vm: ResourceListViewModel = viewModel()) {
+fun ResourceList(vm: ResourceManagerViewModel = viewModel()) {
+    vm.getResourceListFromDb()
     val resourceList = vm.resourceList
     val onSwitchChecked = vm::switchChecked
     NameChangeDialog(

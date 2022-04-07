@@ -16,5 +16,16 @@ data class Feed(
     @ColumnInfo(name = "feed_url")
     val feedUrl: String,
     @ColumnInfo(name = "feed_priority")
-    val feedPriority: Int
-)
+    val feedPriority: Int,
+    @ColumnInfo(name = "is_enable", defaultValue = "true")
+    val isEnable: Boolean
+) {
+    constructor(
+        feedId: Int,
+        feedName: String,
+        feedType: String,
+        feedUrl: String,
+        feedPriority: Int
+    ) :this(feedId, feedName, feedType, feedUrl, feedPriority, true)
+
+}

@@ -27,11 +27,7 @@ import androidx.lifecycle.ViewModel
 import androidx.compose.runtime.Composable
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
-import cn.svecri.feedive.data.AppDatabase
 import cn.svecri.feedive.data.Feed
-import cn.svecri.feedive.ui.theme.FeediveTheme
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
 
 
 data class GroupRow(
@@ -157,7 +153,6 @@ fun GroupSelectDialog(showDialog: Boolean, setShowDialog: (Boolean) -> Unit) {
             }
         }
     }
-
 }
 
 
