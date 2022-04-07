@@ -5,6 +5,7 @@ import androidx.compose.material.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.runtime.*
+import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -20,6 +21,56 @@ class ResourceManagerViewModel(application: Application) : AndroidViewModel(appl
     private val feedDao = appDatabase.feedDao()
 
     var isAddViewShow by mutableStateOf(false)
+
+    var resourceList = mutableStateListOf<ResourceRowData>()
+
+    var isShowNameChangeDialog = mutableStateOf(false)
+
+    var curResourceName = mutableStateOf("")
+
+    private var curResourceRowData = ResourceRowData()
+
+
+    fun getResourceListFromDb(): SnapshotStateList<ResourceRowData> {
+        var feeds: List<Feed>
+        viewModelScope.launch {
+            feeds = feedDao.getAllFeeds()
+            resourceList = feeds.map { feed: Feed ->
+                ResourceRowData(
+                    mutableStateOf(feed.feedName),
+                    mutableStateOf(false),
+                    mutableStateOf(feed.isEnable)
+                )
+            }.toMutableStateList()
+        }
+        return resourceList
+    }
+
+    fun changeCurrentResourceName(newName: String) {
+        curResourceName.value = newName
+    }
+
+    fun switchChecked(resourceData: ResourceRowData) {
+        resourceData.isChecked.value = !resourceData.isChecked.value
+    }
+
+    fun openChangeNameDialog(resourceData: ResourceRowData) {
+        setIsShowNameChangeDialog(true)
+        curResourceRowData = resourceData
+        curResourceName = mutableStateOf(resourceData.resourceName.value)
+    }
+
+    fun updateResourceName() {
+        curResourceRowData.resourceName = curResourceName
+    }
+
+    fun switchEnable(resourceData: ResourceRowData) {
+        resourceData.isEnabled.value = !resourceData.isEnabled.value
+    }
+
+    fun setIsShowNameChangeDialog(isShow: Boolean) {
+        isShowNameChangeDialog.value = isShow
+    }
 
     fun insertFeed(feed: Feed) {
         viewModelScope.launch(Dispatchers.IO) {

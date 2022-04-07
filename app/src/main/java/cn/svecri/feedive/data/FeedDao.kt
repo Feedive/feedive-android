@@ -24,9 +24,6 @@ interface FeedDao {
     fun updateFeeds(feeds: List<Feed>)
 
     @Query("select * from feed")
-    suspend fun getAll(): List<Feed>
-
-    @Query("select * from feed")
     suspend fun getAllFeeds(): List<Feed>
 
     @Query("select * from feed")
