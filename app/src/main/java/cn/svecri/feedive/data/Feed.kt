@@ -10,15 +10,15 @@ data class Feed(
     @ColumnInfo(name = "feed_id")
     val feedId: Int,
     @ColumnInfo(name = "feed_name")
-    val feedName: String,
+    var feedName: String,
     @ColumnInfo(name = "feed_type")
-    val feedType: String,
+    var feedType: String,
     @ColumnInfo(name = "feed_url")
-    val feedUrl: String,
+    var feedUrl: String,
     @ColumnInfo(name = "feed_priority")
-    val feedPriority: Int,
+    var feedPriority: Int,
     @ColumnInfo(name = "is_enable", defaultValue = "true")
-    val isEnable: Boolean
+    var isEnable: Boolean
 ) {
     constructor(
         feedId: Int,

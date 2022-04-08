@@ -165,6 +165,7 @@ fun ResourceList(vm: ResourceManagerViewModel = viewModel()) {
         setNameText = vm::changeCurrentResourceName,
         updateResourceName = vm::updateResourceName
     )
+
     LazyColumn {
         items(items = resourceList) { item ->
             ResourceRow(
