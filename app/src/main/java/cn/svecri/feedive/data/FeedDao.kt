@@ -18,10 +18,13 @@ interface FeedDao {
     fun deleteFeeds(feeds: List<Feed>)
 
     @Update
-    fun updateFeed(feed: Feed)
+    suspend fun updateFeed(feed: Feed)
 
     @Update
     fun updateFeeds(feeds: List<Feed>)
+
+    @Query("select * from feed where feed_name = :name")
+    suspend fun getFeedByName(name: String): Feed
 
     @Query("select * from feed")
     suspend fun getAllFeeds(): List<Feed>

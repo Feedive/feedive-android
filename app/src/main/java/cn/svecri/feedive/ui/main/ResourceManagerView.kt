@@ -5,7 +5,6 @@ import androidx.compose.material.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.runtime.*
-import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -30,11 +29,9 @@ class ResourceManagerViewModel(application: Application) : AndroidViewModel(appl
 
     private var curResourceRowData = ResourceRowData()
 
-
-    fun getResourceListFromDb(): SnapshotStateList<ResourceRowData> {
-        var feeds: List<Feed>
+    fun getResourceListFromDb() {
         viewModelScope.launch {
-            feeds = feedDao.getAllFeeds()
+            val feeds: List<Feed> = feedDao.getAllFeeds()
             resourceList = feeds.map { feed: Feed ->
                 ResourceRowData(
                     mutableStateOf(feed.feedName),
@@ -43,7 +40,6 @@ class ResourceManagerViewModel(application: Application) : AndroidViewModel(appl
                 )
             }.toMutableStateList()
         }
-        return resourceList
     }
 
     fun changeCurrentResourceName(newName: String) {
@@ -61,7 +57,13 @@ class ResourceManagerViewModel(application: Application) : AndroidViewModel(appl
     }
 
     fun updateResourceName() {
+        val initName = curResourceRowData.resourceName.value
         curResourceRowData.resourceName = curResourceName
+        viewModelScope.launch {
+            val feed: Feed = feedDao.getFeedByName(initName)
+            feed.feedName = curResourceName.value
+            feedDao.updateFeed(feed = feed)
+        }
     }
 
     fun switchEnable(resourceData: ResourceRowData) {
