@@ -27,7 +27,13 @@ data class ResourceRowData(
     var resourceName: MutableState<String> = mutableStateOf(""),
     var isChecked: MutableState<Boolean> = mutableStateOf(false),
     var isEnabled: MutableState<Boolean> = mutableStateOf(true),
-)
+) {
+    constructor(resourceName: String, isEnabled: Boolean) : this() {
+        this.resourceName = mutableStateOf(resourceName)
+        this.isEnabled = mutableStateOf(isEnabled)
+        this.isChecked = mutableStateOf(false)
+    }
+}
 
 
 @Composable
@@ -155,21 +161,25 @@ fun NameChangeDialog(
 @Preview
 @Composable
 fun ResourceList(vm: ResourceManagerViewModel = viewModel()) {
-    vm.getResourceListFromDb()
-    val resourceList = vm.resourceList
+
+    val resourceList by remember { vm.allResources() }.collectAsState(initial = listOf())
+
     val onSwitchChecked = vm::switchChecked
     NameChangeDialog(
         showDialog = vm.isShowNameChangeDialog.value,
         setShowDialog = vm::setIsShowNameChangeDialog,
         nameText = vm.curResourceName.value,
-        setNameText = vm::changeCurrentResourceName,
+        setNameText = vm::changeCurrentEditingResourceName,
         updateResourceName = vm::updateResourceName
     )
 
     LazyColumn {
-        items(items = resourceList) { item ->
+        items(items = resourceList) { feed ->
             ResourceRow(
-                rowData = item,
+                rowData = ResourceRowData(
+                    resourceName = feed.feedName,
+                    isEnabled = feed.isEnable
+                ),
                 onCheckedChange = onSwitchChecked,
                 onEnableChange = vm::switchEnable,
                 onNameChanged = vm::openChangeNameDialog

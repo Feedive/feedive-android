@@ -21,28 +21,17 @@ class ResourceManagerViewModel(application: Application) : AndroidViewModel(appl
 
     var isAddViewShow by mutableStateOf(false)
 
-    var resourceList = mutableStateListOf<ResourceRowData>()
-
     var isShowNameChangeDialog = mutableStateOf(false)
 
     var curResourceName = mutableStateOf("")
 
     private var curResourceRowData = ResourceRowData()
 
-    fun getResourceListFromDb() {
-        viewModelScope.launch {
-            val feeds: List<Feed> = feedDao.getAllFeeds()
-            resourceList = feeds.map { feed: Feed ->
-                ResourceRowData(
-                    mutableStateOf(feed.feedName),
-                    mutableStateOf(false),
-                    mutableStateOf(feed.isEnable)
-                )
-            }.toMutableStateList()
-        }
+    fun allResources() = run {
+        feedDao.getAllFeedsFlow()
     }
 
-    fun changeCurrentResourceName(newName: String) {
+    fun changeCurrentEditingResourceName(newName: String) {
         curResourceName.value = newName
     }
 
