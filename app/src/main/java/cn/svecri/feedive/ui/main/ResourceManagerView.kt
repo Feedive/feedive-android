@@ -57,6 +57,11 @@ class ResourceManagerViewModel(application: Application) : AndroidViewModel(appl
 
     fun switchEnable(resourceData: ResourceRowData) {
         resourceData.isEnabled.value = !resourceData.isEnabled.value
+        viewModelScope.launch {
+            val feed: Feed = feedDao.getFeedByName(resourceData.resourceName.value)
+            feed.isEnable = resourceData.isEnabled.value
+            feedDao.updateFeed(feed = feed)
+        }
     }
 
     fun setIsShowNameChangeDialog(isShow: Boolean) {
