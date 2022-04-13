@@ -70,7 +70,6 @@ fun ResourceRow(
                 Icon(Icons.Filled.MoreVert, contentDescription = "More")
             }
         }
-
     }
 }
 
@@ -126,31 +125,9 @@ fun NameChangeDialog(
                     )
                 }
 
-                Row(
-                    Modifier.fillMaxWidth(1f),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceAround
-                ) {
-                    Button(
-                        onClick = { setShowDialog(false) },
-                        colors = ButtonDefaults.buttonColors(Color.White),
-                        elevation = ButtonDefaults.elevation(defaultElevation = 0.dp),
-                        border = BorderStroke(0.dp, Color.White)
-                    )
-                    {
-                        Text(text = "Cancel", color = MaterialTheme.colors.primary)
-                    }
-                    Button(
-                        onClick = {
-                            updateResourceName()
-                            setShowDialog(false)
-                        },
-                        colors = ButtonDefaults.buttonColors(Color.White),
-                        elevation = ButtonDefaults.elevation(defaultElevation = 0.dp),
-                        border = BorderStroke(0.dp, Color.White)
-                    ) {
-                        Text(text = "OK", color = MaterialTheme.colors.primary)
-                    }
+                DialogBottomButtons(setCancelOnClick = { setShowDialog(false) }) {
+                    updateResourceName()
+                    setShowDialog(false)
                 }
             }
         }

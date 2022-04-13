@@ -124,31 +124,9 @@ fun GroupSelectDialog(showDialog: Boolean, setShowDialog: (Boolean) -> Unit) {
                     Spacer(Modifier.size(ButtonDefaults.IconSpacing))
                     Text(text = "Edit groups")
                 }
-                Row(
-                    Modifier.fillMaxWidth(1f),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceAround
-                ) {
-                    Button(
-                        onClick = { setShowDialog(false) },
-                        colors = buttonColors(Color.White),
-                        elevation = ButtonDefaults.elevation(defaultElevation = 0.dp),
-                        border = BorderStroke(0.dp, Color.White)
-                    )
-                    {
-                        Text(text = "Cancel", color = MaterialTheme.colors.primary)
-                    }
-                    Button(
-                        onClick = {
-                            setShowDialog(false)
-                            groupsViewModel.save2db()
-                        },
-                        colors = buttonColors(Color.White),
-                        elevation = ButtonDefaults.elevation(defaultElevation = 0.dp),
-                        border = BorderStroke(0.dp, Color.White)
-                    ) {
-                        Text(text = "OK", color = MaterialTheme.colors.primary)
-                    }
+                DialogBottomButtons(setCancelOnClick = { setShowDialog(false) }) {
+                    setShowDialog(false)
+                    groupsViewModel.save2db()
                 }
             }
         }
