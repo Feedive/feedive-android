@@ -8,6 +8,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.*
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.runtime.*
@@ -41,7 +42,8 @@ fun ResourceRow(
     rowData: ResourceRowData,
     onCheckedChange: (ResourceRowData) -> Unit,
     onEnableChange: (ResourceRowData) -> Unit,
-    onNameChanged: (ResourceRowData) -> Unit
+    onNameChanged: (ResourceRowData) -> Unit,
+    onDelete:(ResourceRowData) -> Unit
 ) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
@@ -66,8 +68,8 @@ fun ResourceRow(
                 Icon(Icons.Filled.Edit, contentDescription = "EditName")
             }
             Switch(checked = rowData.isEnabled.value, onCheckedChange = { onEnableChange(rowData) })
-            IconButton(onClick = { /*TODO*/ }) {
-                Icon(Icons.Filled.MoreVert, contentDescription = "More")
+            IconButton(onClick = { onDelete(rowData) }) {
+                Icon(Icons.Filled.Delete, contentDescription = "Delete")
             }
         }
     }
@@ -159,7 +161,8 @@ fun ResourceList(vm: ResourceManagerViewModel = viewModel()) {
                 ),
                 onCheckedChange = onSwitchChecked,
                 onEnableChange = vm::switchEnable,
-                onNameChanged = vm::openChangeNameDialog
+                onNameChanged = vm::openChangeNameDialog,
+                onDelete = vm::deleteFeed
             )
             Divider()
         }

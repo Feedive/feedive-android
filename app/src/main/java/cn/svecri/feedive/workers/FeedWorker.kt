@@ -21,7 +21,7 @@ class FeedWorker(context: Context, workerParams: WorkerParameters): CoroutineWor
                         1,
                     ),
                     Feed(0, "Imobile", "rss", "http://news.imobile.com.cn/rss/news.xml", 2),
-                    Feed(0, "Sample", "rss", "https://www.rssboard.org/files/sample-rss-2.xml", 4),
+                    Feed(0, "SampleRss", "rss", "https://www.rssboard.org/files/sample-rss-2.xml", 4),
                 )
             )
             Result.success()

@@ -77,6 +77,13 @@ class ResourceManagerViewModel(application: Application) : AndroidViewModel(appl
     fun setIsAddViewShow(isShow: Boolean) {
         isAddViewShow = isShow
     }
+
+    fun deleteFeed(resourceData: ResourceRowData){
+        viewModelScope.launch {
+            val feed: Feed = feedDao.getFeedByName(resourceData.resourceName.value)
+            feedDao.deleteFeed(feed = feed)
+        }
+    }
 }
 
 @Composable

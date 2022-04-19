@@ -38,8 +38,8 @@ data class GroupRow(
 class GroupsViewModel : ViewModel() {
     /*TODO: read from sql*/
     var groups = mutableStateListOf(
-        GroupRow(mutableStateOf(false), "group1"),
-        GroupRow(mutableStateOf(false), "group2")
+        GroupRow(mutableStateOf(false), "IT"),
+        GroupRow(mutableStateOf(false), "Music")
     )
 
     fun switchCheckState(row: GroupRow) {

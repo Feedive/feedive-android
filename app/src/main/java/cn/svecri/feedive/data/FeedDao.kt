@@ -12,7 +12,7 @@ interface FeedDao {
     fun insertFeeds(feeds: List<Feed>)
 
     @Delete
-    fun deleteFeed(feed: Feed)
+    suspend fun deleteFeed(feed: Feed)
 
     @Delete
     fun deleteFeeds(feeds: List<Feed>)
